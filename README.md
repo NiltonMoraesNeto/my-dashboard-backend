@@ -175,7 +175,6 @@ O projeto vem com dados pré-populados:
 
 ## 🚀 Próximos Passos
 
-- [ ] Implementar autenticação JWT
 - [ ] Adicionar middleware de logging
 - [ ] Implementar cache com Redis
 - [ ] Adicionar testes unitários e e2e
