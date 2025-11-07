@@ -63,6 +63,18 @@ export class UpdateUserDto {
   avatar?: string;
 }
 
+export class ChangePasswordDto {
+  @ApiProperty({ description: 'Senha atual do usuário' })
+  @IsString()
+  @MinLength(6)
+  currentPassword: string;
+
+  @ApiProperty({ description: 'Nova senha do usuário' })
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
+}
+
 export class UserResponseDto {
   @ApiProperty()
   id: string;

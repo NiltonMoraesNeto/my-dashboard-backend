@@ -52,6 +52,8 @@ export class AuthService {
       email: user.email,
       sub: user.id,
       perfilId: user.perfilId,
+      nome: user.nome,
+      avatar: user.avatar,
     };
 
     return {
@@ -62,6 +64,8 @@ export class AuthService {
         email: user.email,
         perfilId: user.perfilId,
         perfil: user.perfil,
+        avatar: user.avatar,
+        cep: user.cep,
       },
     };
   }
@@ -69,5 +73,22 @@ export class AuthService {
   async hashPassword(password: string): Promise<string> {
     const saltOrRounds = 10;
     return bcrypt.hash(password, saltOrRounds);
+  }
+
+  async validateToken(token: string) {
+    try {
+      const decoded = this.jwtService.verify(token);
+      const user = await this.usersService.findByEmail(decoded.email);
+      
+      if (!user) {
+        throw new UnauthorizedException('Usuário não encontrado');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } catch {
+      throw new UnauthorizedException('Token inválido');
+    }
   }
 }

@@ -1,13 +1,22 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
-  app.enableCors();
+  // Enable cookie parser
+  app.use(cookieParser());
+
+  // Enable CORS com suporte a cookies
+  app.enableCors({
+    origin: 'http://localhost:5173', // URL do frontend
+    credentials: true, // Permite envio de cookies
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   // Global validation pipe
   app.useGlobalPipes(

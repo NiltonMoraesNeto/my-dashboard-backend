@@ -8,6 +8,7 @@ import {
   Delete,
   HttpStatus,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,6 +22,7 @@ import {
   UpdateProfileDto,
   ProfileResponseDto,
 } from './dto/profile.dto';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('profiles')
 @ApiBearerAuth('access-token')
@@ -39,6 +41,7 @@ export class ProfilesController {
     return this.profilesService.create(createProfileDto);
   }
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Listar todos os perfis' })
   @ApiResponse({
@@ -46,8 +49,16 @@ export class ProfilesController {
     description: 'Lista de perfis.',
     type: [ProfileResponseDto],
   })
-  findAll() {
-    return this.profilesService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('search') search?: string,
+  ) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+    const searchTerm = search || '';
+    
+    return this.profilesService.findAll(pageNumber, limit, searchTerm);
   }
 
   @Get(':id')

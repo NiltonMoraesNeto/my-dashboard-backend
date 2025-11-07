@@ -7,6 +7,9 @@ import {
   Param,
   Delete,
   HttpStatus,
+  Query,
+  Put,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,7 +18,8 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
+import { CreateUserDto, UpdateUserDto, UserResponseDto, ChangePasswordDto } from './dto/user.dto';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth('access-token')
@@ -23,6 +27,7 @@ import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Public()
   @Post()
   @ApiOperation({ summary: 'Criar um novo usuário' })
   @ApiResponse({
@@ -41,8 +46,16 @@ export class UsersController {
     description: 'Lista de usuários.',
     type: [UserResponseDto],
   })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('search') search?: string,
+  ) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+    const searchTerm = search || '';
+    
+    return this.usersService.findAll(pageNumber, limit, searchTerm);
   }
 
   @Get(':id')
@@ -87,5 +100,59 @@ export class UsersController {
   })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Solicitar recuperação de senha' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token de recuperação gerado.',
+  })
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.usersService.forgotPassword(body.email);
+  }
+
+  @Public()
+  @Put('reset-password')
+  @ApiOperation({ summary: 'Resetar senha com token' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Senha alterada com sucesso.',
+  })
+  async resetPassword(
+    @Body() body: { email: string; resetCode: string; newPassword: string },
+  ) {
+    return this.usersService.resetPassword(
+      body.email,
+      body.resetCode,
+      body.newPassword,
+    );
+  }
+
+  @Public()
+  @Put('clean-resetCode')
+  @ApiOperation({ summary: 'Limpar código de reset' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Código limpo com sucesso.',
+  })
+  async cleanResetCode(
+    @Body() body: { email: string; resetCode: string },
+  ) {
+    return this.usersService.cleanResetCode(body.email, body.resetCode);
+  }
+
+  @Patch('change-password')
+  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Senha alterada com sucesso.',
+  })
+  async changePassword(
+    @Req() req,
+    @Body() body: ChangePasswordDto,
+  ) {
+    return this.usersService.changePassword(req.user.userId, body);
   }
 }
