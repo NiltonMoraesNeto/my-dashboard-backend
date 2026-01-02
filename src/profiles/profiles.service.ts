@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProfileDto, UpdateProfileDto } from './dto/profile.dto';
 
@@ -65,10 +65,20 @@ export class ProfilesService {
   }
 
   async remove(id: number) {
-    const profile = await this.prisma.profile.findUnique({ where: { id } });
+    const profile = await this.prisma.profile.findUnique({ 
+      where: { id },
+      include: { users: true },
+    });
 
     if (!profile) {
       throw new NotFoundException(`Profile with ID ${id} not found`);
+    }
+
+    // Verificar se há usuários vinculados a este perfil
+    if (profile.users && profile.users.length > 0) {
+      throw new BadRequestException(
+        `Não é possível excluir o perfil "${profile.descricao}" pois existem ${profile.users.length} usuário(s) vinculado(s) a ele.`,
+      );
     }
 
     return this.prisma.profile.delete({ where: { id } });

@@ -15,6 +15,8 @@ async function main() {
     { id: 4, descricao: 'Compras' },
     { id: 5, descricao: 'Vendas' },
     { id: 6, descricao: 'Usuário' },
+    { id: 7, descricao: 'Condomínio' },
+    { id: 8, descricao: 'Morador' },
   ];
 
   for (const profile of profiles) {

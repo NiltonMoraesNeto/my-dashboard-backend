@@ -36,6 +36,7 @@ async function bootstrap() {
     .addTag('profiles', 'Operações relacionadas aos perfis')
     .addTag('sales', 'Operações relacionadas às vendas')
     .addTag('auth', 'Operações de autenticação')
+    .addTag('condominio', 'Operações relacionadas à gestão de condomínio')
     .addBearerAuth(
       {
         type: 'http',
