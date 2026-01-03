@@ -12,6 +12,10 @@ import {
   CreateContaPagarDto,
   UpdateContaPagarDto,
 } from './dto/conta-pagar.dto';
+import {
+  CreateBalanceteMovimentacaoDto,
+  UpdateBalanceteMovimentacaoDto,
+} from './dto/balancete-movimentacao.dto';
 import { CreateBoletoDto, UpdateBoletoDto } from './dto/boleto.dto';
 import { CreateReuniaoDto, UpdateReuniaoDto } from './dto/reuniao.dto';
 import { CreateAvisoDto, UpdateAvisoDto } from './dto/aviso.dto';
@@ -797,6 +801,7 @@ export class CondominioService {
     ]);
 
     // Buscar leituras do usuário
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const leituras = (await (this.prisma as any).avisoLeitura.findMany({
       where: { userId },
       select: { avisoId: true, lido: true },
@@ -936,6 +941,7 @@ export class CondominioService {
     }
 
     // Buscar avisos que foram lidos
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const avisosLidos = (await (this.prisma as any).avisoLeitura.findMany({
       where: {
         userId,
@@ -1002,6 +1008,7 @@ export class CondominioService {
     }
 
     // Criar ou atualizar registro de leitura
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     await (this.prisma as any).avisoLeitura.upsert({
       where: {
         userId_avisoId: {
@@ -1238,6 +1245,113 @@ export class CondominioService {
     }
 
     return this.prisma.user.delete({
+      where: { id },
+    });
+  }
+
+  // ========== BALANCETE MOVIMENTACAO ==========
+  async createBalanceteMovimentacao(
+    userId: string,
+    createBalanceteMovimentacaoDto: CreateBalanceteMovimentacaoDto,
+  ) {
+    return this.prisma.balanceteMovimentacao.create({
+      data: {
+        ...createBalanceteMovimentacaoDto,
+        data: new Date(createBalanceteMovimentacaoDto.data),
+        userId,
+      },
+    });
+  }
+
+  async findAllBalanceteMovimentacoes(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    tipo?: string,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const where: {
+      userId: string;
+      tipo?: string;
+    } = { userId };
+    if (tipo) where.tipo = tipo;
+
+    const [data, total] = await Promise.all([
+      this.prisma.balanceteMovimentacao.findMany({
+        where,
+        orderBy: { data: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.balanceteMovimentacao.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findOneBalanceteMovimentacao(userId: string, id: string) {
+    const movimentacao = await this.prisma.balanceteMovimentacao.findUnique({
+      where: { id },
+    });
+
+    if (!movimentacao) {
+      throw new NotFoundException(
+        `Movimentação com ID ${id} não encontrada`,
+      );
+    }
+
+    if (movimentacao.userId !== userId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta movimentação',
+      );
+    }
+
+    return movimentacao;
+  }
+
+  async updateBalanceteMovimentacao(
+    userId: string,
+    id: string,
+    updateBalanceteMovimentacaoDto: UpdateBalanceteMovimentacaoDto,
+  ) {
+    const movimentacao = await this.findOneBalanceteMovimentacao(userId, id);
+
+    const data: {
+      tipo?: string;
+      data?: Date;
+      valor?: number;
+      motivo?: string;
+    } = {};
+
+    if (updateBalanceteMovimentacaoDto.tipo !== undefined) {
+      data.tipo = updateBalanceteMovimentacaoDto.tipo;
+    }
+    if (updateBalanceteMovimentacaoDto.data !== undefined) {
+      data.data = new Date(updateBalanceteMovimentacaoDto.data);
+    }
+    if (updateBalanceteMovimentacaoDto.valor !== undefined) {
+      data.valor = updateBalanceteMovimentacaoDto.valor;
+    }
+    if (updateBalanceteMovimentacaoDto.motivo !== undefined) {
+      data.motivo = updateBalanceteMovimentacaoDto.motivo;
+    }
+
+    return this.prisma.balanceteMovimentacao.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async removeBalanceteMovimentacao(userId: string, id: string) {
+    await this.findOneBalanceteMovimentacao(userId, id);
+
+    return this.prisma.balanceteMovimentacao.delete({
       where: { id },
     });
   }

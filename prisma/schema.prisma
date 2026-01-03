@@ -34,6 +34,7 @@ model User {
   reunioes            Reuniao[]
   avisos              Aviso[]
   avisosLidos         AvisoLeitura[]
+  balanceteMovimentacoes BalanceteMovimentacao[]
 
   @@map("usuarios")
 }
@@ -180,4 +181,19 @@ model AvisoLeitura {
 
   @@unique([userId, avisoId])
   @@map("aviso_leitura")
+}
+
+model BalanceteMovimentacao {
+  id        String   @id @default(cuid())
+  tipo      String   // "Entrada" ou "Saída"
+  data      DateTime
+  valor     Float
+  motivo    String
+  userId    String // Usuário do condomínio
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("balancete_movimentacao")
 }

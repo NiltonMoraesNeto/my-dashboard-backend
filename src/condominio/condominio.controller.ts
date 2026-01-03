@@ -50,6 +50,11 @@ import {
   BalanceteQueryDto,
 } from './dto/balancete.dto';
 import {
+  CreateBalanceteMovimentacaoDto,
+  UpdateBalanceteMovimentacaoDto,
+  BalanceteMovimentacaoResponseDto,
+} from './dto/balancete-movimentacao.dto';
+import {
   CreateMoradorDto,
   UpdateMoradorDto,
   MoradorResponseDto,
@@ -556,6 +561,96 @@ export class CondominioController {
   removeMorador(@Req() req: Request, @Param('id') id: string) {
     const userId = (req.user as any).userId;
     return this.condominioService.removeMorador(userId, id);
+  }
+
+  // ========== BALANCETE MOVIMENTACAO ==========
+  @Post('balancete/movimentacoes')
+  @ApiOperation({ summary: 'Criar uma nova movimentação do balancete' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Movimentação criada com sucesso.',
+    type: BalanceteMovimentacaoResponseDto,
+  })
+  createBalanceteMovimentacao(
+    @Req() req: Request,
+    @Body() createBalanceteMovimentacaoDto: CreateBalanceteMovimentacaoDto,
+  ) {
+    const userId = (req.user as any).userId;
+    return this.condominioService.createBalanceteMovimentacao(
+      userId,
+      createBalanceteMovimentacaoDto,
+    );
+  }
+
+  @Get('balancete/movimentacoes')
+  @ApiOperation({ summary: 'Listar todas as movimentações do balancete' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de movimentações.',
+    type: [BalanceteMovimentacaoResponseDto],
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
+  @ApiQuery({ name: 'tipo', required: false, type: String })
+  findAllBalanceteMovimentacoes(
+    @Req() req: Request,
+    @Query('page') page?: string,
+    @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('tipo') tipo?: string,
+  ) {
+    const userId = (req.user as any).userId;
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+
+    return this.condominioService.findAllBalanceteMovimentacoes(
+      userId,
+      pageNumber,
+      limit,
+      tipo,
+    );
+  }
+
+  @Get('balancete/movimentacoes/:id')
+  @ApiOperation({ summary: 'Buscar movimentação por ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Movimentação encontrada.',
+    type: BalanceteMovimentacaoResponseDto,
+  })
+  findOneBalanceteMovimentacao(@Req() req: Request, @Param('id') id: string) {
+    const userId = (req.user as any).userId;
+    return this.condominioService.findOneBalanceteMovimentacao(userId, id);
+  }
+
+  @Patch('balancete/movimentacoes/:id')
+  @ApiOperation({ summary: 'Atualizar movimentação' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Movimentação atualizada com sucesso.',
+    type: BalanceteMovimentacaoResponseDto,
+  })
+  updateBalanceteMovimentacao(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() updateBalanceteMovimentacaoDto: UpdateBalanceteMovimentacaoDto,
+  ) {
+    const userId = (req.user as any).userId;
+    return this.condominioService.updateBalanceteMovimentacao(
+      userId,
+      id,
+      updateBalanceteMovimentacaoDto,
+    );
+  }
+
+  @Delete('balancete/movimentacoes/:id')
+  @ApiOperation({ summary: 'Excluir movimentação' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Movimentação excluída com sucesso.',
+  })
+  removeBalanceteMovimentacao(@Req() req: Request, @Param('id') id: string) {
+    const userId = (req.user as any).userId;
+    return this.condominioService.removeBalanceteMovimentacao(userId, id);
   }
 
   // ========== BALANCETE ==========
