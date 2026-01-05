@@ -1,39 +1,35 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsDateString, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateBoletoDto {
   @ApiProperty({ description: 'ID da unidade' })
   @IsString()
   unidadeId: string;
 
-  @ApiProperty({ description: 'Mês do boleto (1-12)' })
-  @IsInt()
-  @Min(1)
-  mes: number;
-
-  @ApiProperty({ description: 'Ano do boleto' })
-  @IsInt()
-  @Min(2000)
-  ano: number;
+  @ApiProperty({ description: 'Descrição do boleto' })
+  @IsString()
+  descricao: string;
 
   @ApiProperty({ description: 'Valor do boleto' })
-  @IsNumber()
-  @Min(0)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsNumber({}, { message: 'valor must be a number conforming to the specified constraints' })
+  @Min(0, { message: 'valor must not be less than 0' })
   valor: number;
 
   @ApiProperty({ description: 'Data de vencimento' })
   @IsDateString()
   vencimento: string;
 
-  @ApiProperty({ description: 'Código de barras', required: false })
+  @ApiProperty({ description: 'Arquivo PDF do boleto', type: 'string', format: 'binary', required: false })
   @IsOptional()
-  @IsString()
-  codigoBarras?: string;
-
-  @ApiProperty({ description: 'Nosso número', required: false })
-  @IsOptional()
-  @IsString()
-  nossoNumero?: string;
+  arquivo?: Express.Multer.File;
 
   @ApiProperty({ description: 'Status do boleto', required: false, default: 'Pendente' })
   @IsOptional()
@@ -57,22 +53,22 @@ export class UpdateBoletoDto {
   @IsString()
   unidadeId?: string;
 
-  @ApiProperty({ description: 'Mês do boleto (1-12)', required: false })
+  @ApiProperty({ description: 'Descrição do boleto', required: false })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  mes?: number;
-
-  @ApiProperty({ description: 'Ano do boleto', required: false })
-  @IsOptional()
-  @IsInt()
-  @Min(2000)
-  ano?: number;
+  @IsString()
+  descricao?: string;
 
   @ApiProperty({ description: 'Valor do boleto', required: false })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
+  @Transform(({ value }) => {
+    if (value !== undefined && typeof value === 'string') {
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsNumber({}, { message: 'valor must be a number conforming to the specified constraints' })
+  @Min(0, { message: 'valor must not be less than 0' })
   valor?: number;
 
   @ApiProperty({ description: 'Data de vencimento', required: false })
@@ -80,15 +76,11 @@ export class UpdateBoletoDto {
   @IsDateString()
   vencimento?: string;
 
-  @ApiProperty({ description: 'Código de barras', required: false })
+  @ApiProperty({ description: 'Arquivo PDF do boleto', type: 'string', format: 'binary', required: false })
   @IsOptional()
-  @IsString()
-  codigoBarras?: string;
+  arquivo?: Express.Multer.File;
 
-  @ApiProperty({ description: 'Nosso número', required: false })
-  @IsOptional()
-  @IsString()
-  nossoNumero?: string;
+  arquivoPdf?: string; // Campo interno para armazenar o caminho após upload
 
   @ApiProperty({ description: 'Status do boleto', required: false })
   @IsOptional()
@@ -114,10 +106,7 @@ export class BoletoResponseDto {
   unidadeId: string;
 
   @ApiProperty()
-  mes: number;
-
-  @ApiProperty()
-  ano: number;
+  descricao: string;
 
   @ApiProperty()
   valor: number;
@@ -126,10 +115,7 @@ export class BoletoResponseDto {
   vencimento: Date;
 
   @ApiProperty({ required: false })
-  codigoBarras?: string;
-
-  @ApiProperty({ required: false })
-  nossoNumero?: string;
+  arquivoPdf?: string;
 
   @ApiProperty()
   status: string;

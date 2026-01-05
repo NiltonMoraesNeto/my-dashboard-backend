@@ -27,13 +27,13 @@ model User {
   condominio User?   @relation("CondominioMoradores", fields: [condominioId], references: [id])
   moradores  User[]  @relation("CondominioMoradores")
 
-  unidades            Unidade[]
-  unidadesComoMorador Unidade[]      @relation("UnidadeMorador")
-  contasPagar         ContaPagar[]
-  boletos             Boleto[]
-  reunioes            Reuniao[]
-  avisos              Aviso[]
-  avisosLidos         AvisoLeitura[]
+  unidades               Unidade[]
+  unidadesComoMorador    Unidade[]               @relation("UnidadeMorador")
+  contasPagar            ContaPagar[]
+  boletos                Boleto[]
+  reunioes               Reuniao[]
+  avisos                 Aviso[]
+  avisosLidos            AvisoLeitura[]
   balanceteMovimentacoes BalanceteMovimentacao[]
 
   @@map("usuarios")
@@ -113,12 +113,10 @@ model ContaPagar {
 model Boleto {
   id            String    @id @default(cuid())
   unidadeId     String
-  mes           Int // 1-12
-  ano           Int
+  descricao     String
   valor         Float
   vencimento    DateTime
-  codigoBarras  String?
-  nossoNumero   String?
+  arquivoPdf    String? // URL do arquivo PDF
   status        String    @default("Pendente") // "Pendente", "Pago", "Vencido", "Cancelado"
   dataPagamento DateTime?
   userId        String // Usuário do condomínio
@@ -185,7 +183,7 @@ model AvisoLeitura {
 
 model BalanceteMovimentacao {
   id        String   @id @default(cuid())
-  tipo      String   // "Entrada" ou "Saída"
+  tipo      String // "Entrada" ou "Saída"
   data      DateTime
   valor     Float
   motivo    String

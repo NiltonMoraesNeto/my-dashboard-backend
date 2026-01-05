@@ -7,6 +7,8 @@ import {
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import * as fs from 'fs';
+import * as path from 'path';
 import { CreateUnidadeDto, UpdateUnidadeDto } from './dto/unidade.dto';
 import {
   CreateContaPagarDto,
@@ -336,32 +338,32 @@ export class CondominioService {
       );
     }
 
+    // Processar upload do arquivo PDF
+    let arquivoPdf: string | undefined;
+    if (createBoletoDto.arquivo) {
+      arquivoPdf = await this.saveBoletoFile(createBoletoDto.arquivo);
+    }
+
     const data: {
       unidadeId: string;
-      mes: number;
-      ano: number;
+      descricao: string;
       valor: number;
       vencimento: Date;
-      codigoBarras?: string;
-      nossoNumero?: string;
+      arquivoPdf?: string;
       status?: string;
       dataPagamento?: Date;
       observacoes?: string;
       userId: string;
     } = {
       unidadeId: createBoletoDto.unidadeId,
-      mes: createBoletoDto.mes,
-      ano: createBoletoDto.ano,
+      descricao: createBoletoDto.descricao,
       valor: createBoletoDto.valor,
       vencimento: new Date(createBoletoDto.vencimento),
       userId,
     };
 
-    if (createBoletoDto.codigoBarras !== undefined) {
-      data.codigoBarras = createBoletoDto.codigoBarras;
-    }
-    if (createBoletoDto.nossoNumero !== undefined) {
-      data.nossoNumero = createBoletoDto.nossoNumero;
+    if (arquivoPdf) {
+      data.arquivoPdf = arquivoPdf;
     }
     if (createBoletoDto.status !== undefined) {
       data.status = createBoletoDto.status;
@@ -385,8 +387,6 @@ export class CondominioService {
     userId: string,
     page: number = 1,
     limit: number = 10,
-    mes?: number,
-    ano?: number,
     unidadeId?: string,
   ) {
     const skip = (page - 1) * limit;
@@ -442,8 +442,6 @@ export class CondominioService {
     }
 
     // Aplicar filtros adicionais
-    if (mes !== undefined) boletosWhere.mes = mes;
-    if (ano !== undefined) boletosWhere.ano = ano;
     if (unidadeId) {
       // Verificar se a unidade pertence ao usuário (apenas para condomínio)
       if (perfilCondominio && user.perfilId === perfilCondominio.id) {
@@ -456,7 +454,6 @@ export class CondominioService {
           );
         }
       }
-      // Se já tem unidadeId como array (morador), substitui pelo filtro específico
       boletosWhere.unidadeId = unidadeId;
     }
 
@@ -540,7 +537,7 @@ export class CondominioService {
     id: string,
     updateBoletoDto: UpdateBoletoDto,
   ) {
-    await this.findOneBoleto(userId, id); // Valida existência e permissão
+    const boleto = await this.findOneBoleto(userId, id); // Valida existência e permissão
 
     // Se atualizar unidadeId, verificar se pertence ao usuário
     if (updateBoletoDto.unidadeId) {
@@ -554,14 +551,22 @@ export class CondominioService {
       }
     }
 
+    // Processar upload do arquivo PDF se fornecido
+    if (updateBoletoDto.arquivo) {
+      // Deletar arquivo antigo se existir
+      if (boleto.arquivoPdf) {
+        await this.deleteBoletoFile(boleto.arquivoPdf);
+      }
+      // Salvar novo arquivo
+      updateBoletoDto.arquivoPdf = await this.saveBoletoFile(updateBoletoDto.arquivo);
+    }
+
     const data: {
       unidadeId?: string;
-      mes?: number;
-      ano?: number;
+      descricao?: string;
       valor?: number;
       vencimento?: Date;
-      codigoBarras?: string;
-      nossoNumero?: string;
+      arquivoPdf?: string;
       status?: string;
       dataPagamento?: Date;
       observacoes?: string;
@@ -570,11 +575,8 @@ export class CondominioService {
     if (updateBoletoDto.unidadeId !== undefined) {
       data.unidadeId = updateBoletoDto.unidadeId;
     }
-    if (updateBoletoDto.mes !== undefined) {
-      data.mes = updateBoletoDto.mes;
-    }
-    if (updateBoletoDto.ano !== undefined) {
-      data.ano = updateBoletoDto.ano;
+    if (updateBoletoDto.descricao !== undefined) {
+      data.descricao = updateBoletoDto.descricao;
     }
     if (updateBoletoDto.valor !== undefined) {
       data.valor = updateBoletoDto.valor;
@@ -582,11 +584,8 @@ export class CondominioService {
     if (updateBoletoDto.vencimento) {
       data.vencimento = new Date(updateBoletoDto.vencimento);
     }
-    if (updateBoletoDto.codigoBarras !== undefined) {
-      data.codigoBarras = updateBoletoDto.codigoBarras;
-    }
-    if (updateBoletoDto.nossoNumero !== undefined) {
-      data.nossoNumero = updateBoletoDto.nossoNumero;
+    if (updateBoletoDto.arquivoPdf !== undefined) {
+      data.arquivoPdf = updateBoletoDto.arquivoPdf;
     }
     if (updateBoletoDto.status !== undefined) {
       data.status = updateBoletoDto.status;
@@ -608,11 +607,60 @@ export class CondominioService {
   }
 
   async removeBoleto(userId: string, id: string) {
-    await this.findOneBoleto(userId, id); // Valida existência e permissão
+    const boleto = await this.findOneBoleto(userId, id); // Valida existência e permissão
+
+    // Deletar arquivo PDF se existir
+    if (boleto.arquivoPdf) {
+      await this.deleteBoletoFile(boleto.arquivoPdf);
+    }
 
     return this.prisma.boleto.delete({
       where: { id },
     });
+  }
+
+  // Métodos auxiliares para gerenciamento de arquivos
+  private async saveBoletoFile(file: Express.Multer.File): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'boletos');
+    
+    // Criar diretório se não existir
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Gerar nome único para o arquivo
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}${fileExtension}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Salvar arquivo
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Retornar caminho relativo para armazenar no banco
+    return `uploads/boletos/${fileName}`;
+  }
+
+  private async deleteBoletoFile(filePath: string): Promise<void> {
+    const fullPath = path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
+  async getBoletoPdfPath(userId: string, id: string): Promise<string | null> {
+    const boleto = await this.findOneBoleto(userId, id);
+    
+    if (!boleto.arquivoPdf) {
+      return null;
+    }
+
+    const fullPath = path.join(process.cwd(), boleto.arquivoPdf);
+    
+    if (!fs.existsSync(fullPath)) {
+      return null;
+    }
+
+    return fullPath;
   }
 
   // ========== REUNIÕES ==========

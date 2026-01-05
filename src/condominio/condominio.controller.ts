@@ -10,7 +10,13 @@ import {
   Query,
   ParseIntPipe,
   Req,
+  UseInterceptors,
+  UploadedFile,
+  Res,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import type { Request } from 'express';
 import {
   ApiTags,
@@ -233,14 +239,20 @@ export class CondominioController {
 
   // ========== BOLETOS ==========
   @Post('boletos')
+  @UseInterceptors(FileInterceptor('arquivo'))
   @ApiOperation({ summary: 'Criar um novo boleto' })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Boleto criado com sucesso.',
     type: BoletoResponseDto,
   })
-  createBoleto(@Req() req: Request, @Body() createBoletoDto: CreateBoletoDto) {
+  createBoleto(
+    @Req() req: Request,
+    @Body() createBoletoDto: CreateBoletoDto,
+    @UploadedFile() arquivo?: Express.Multer.File,
+  ) {
     const userId = (req.user as any).userId;
+    createBoletoDto.arquivo = arquivo;
     return this.condominioService.createBoleto(userId, createBoletoDto);
   }
 
@@ -253,29 +265,21 @@ export class CondominioController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
-  @ApiQuery({ name: 'mes', required: false, type: Number })
-  @ApiQuery({ name: 'ano', required: false, type: Number })
   @ApiQuery({ name: 'unidadeId', required: false, type: String })
   findAllBoletos(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
-    @Query('mes') mes?: string,
-    @Query('ano') ano?: string,
     @Query('unidadeId') unidadeId?: string,
   ) {
     const userId = (req.user as any).userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
-    const mesNumber = mes ? parseInt(mes, 10) : undefined;
-    const anoNumber = ano ? parseInt(ano, 10) : undefined;
     
     return this.condominioService.findAllBoletos(
       userId,
       pageNumber,
       limit,
-      mesNumber,
-      anoNumber,
       unidadeId,
     );
   }
@@ -293,6 +297,7 @@ export class CondominioController {
   }
 
   @Patch('boletos/:id')
+  @UseInterceptors(FileInterceptor('arquivo'))
   @ApiOperation({ summary: 'Atualizar boleto' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -303,9 +308,47 @@ export class CondominioController {
     @Req() req: Request,
     @Param('id') id: string,
     @Body() updateBoletoDto: UpdateBoletoDto,
+    @UploadedFile() arquivo?: Express.Multer.File,
   ) {
     const userId = (req.user as any).userId;
+    updateBoletoDto.arquivo = arquivo;
     return this.condominioService.updateBoleto(userId, id, updateBoletoDto);
+  }
+
+  @Get('boletos/:id/download')
+  @ApiOperation({ summary: 'Download do PDF do boleto' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'PDF do boleto.',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async downloadBoletoPdf(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const userId = (req.user as any).userId;
+    const filePath = await this.condominioService.getBoletoPdfPath(userId, id);
+    
+    if (!filePath) {
+      return res.status(HttpStatus.NOT_FOUND).json({
+        message: 'Arquivo PDF não encontrado',
+      });
+    }
+
+    return res.sendFile(filePath, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename=boleto-${id}.pdf`,
+      },
+    });
   }
 
   @Delete('boletos/:id')
