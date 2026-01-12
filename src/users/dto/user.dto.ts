@@ -30,6 +30,11 @@ export class CreateUserDto {
   @IsString()
   cep?: string;
 
+  @ApiProperty({ description: 'ID do condomínio (obrigatório quando perfil for Morador)', required: false })
+  @IsOptional()
+  @IsString()
+  condominioId?: string;
+
   @ApiProperty({ description: 'Avatar do usuário', required: false })
   @IsOptional()
   @IsString()
@@ -56,6 +61,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   cep?: string;
+
+  @ApiProperty({ description: 'ID do condomínio (obrigatório quando perfil for Morador)', required: false })
+  @IsOptional()
+  @IsString()
+  condominioId?: string;
 
   @ApiProperty({ description: 'Avatar do usuário', required: false })
   @IsOptional()

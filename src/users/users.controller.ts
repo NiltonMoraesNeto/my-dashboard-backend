@@ -58,6 +58,16 @@ export class UsersController {
     return this.usersService.findAll(pageNumber, limit, searchTerm);
   }
 
+  @Get('condominios/list')
+  @ApiOperation({ summary: 'Listar todos os condomínios' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de condomínios.',
+  })
+  async findAllCondominios() {
+    return this.usersService.findAllCondominios();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar usuário por ID' })
   @ApiResponse({

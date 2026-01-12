@@ -8,6 +8,43 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
+    // Buscar perfis para validação
+    const allProfiles = await this.prisma.profile.findMany();
+    const perfilMorador = allProfiles.find((p) =>
+      p.descricao.toLowerCase().includes('morador'),
+    );
+
+    // Se o perfil for Morador, validar condominioId
+    if (perfilMorador && createUserDto.perfilId === perfilMorador.id) {
+      if (!createUserDto.condominioId) {
+        throw new BadRequestException(
+          'Condomínio é obrigatório para usuários com perfil Morador',
+        );
+      }
+
+      // Verificar se o condomínio existe
+      const condominio = await this.prisma.user.findUnique({
+        where: { id: createUserDto.condominioId },
+      });
+
+      if (!condominio) {
+        throw new NotFoundException('Condomínio não encontrado');
+      }
+
+      // Verificar se o condomínio tem perfil de Condomínio
+      const perfilCondominio = allProfiles.find(
+        (p) =>
+          p.descricao.toLowerCase().includes('condomínio') ||
+          p.descricao.toLowerCase().includes('condominio'),
+      );
+
+      if (perfilCondominio && condominio.perfilId !== perfilCondominio.id) {
+        throw new BadRequestException(
+          'O ID informado não corresponde a um condomínio válido',
+        );
+      }
+    }
+
     // Hash password before saving
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
@@ -78,6 +115,7 @@ export class UsersService {
         cep: true,
         avatar: true,
         resetCode: true,
+        condominioId: true,
         createdAt: true,
         updatedAt: true,
         perfil: true,
@@ -238,5 +276,36 @@ export class UsersService {
     });
 
     return { message: 'Senha alterada com sucesso' };
+  }
+
+  async findAllCondominios() {
+    // Buscar perfil Condomínio
+    const allProfiles = await this.prisma.profile.findMany();
+    const perfilCondominio = allProfiles.find(
+      (p) =>
+        p.descricao.toLowerCase().includes('condomínio') ||
+        p.descricao.toLowerCase().includes('condominio'),
+    );
+
+    if (!perfilCondominio) {
+      return [];
+    }
+
+    // Buscar todos os usuários com perfil Condomínio
+    const condominios = await this.prisma.user.findMany({
+      where: {
+        perfilId: perfilCondominio.id,
+      },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+      },
+      orderBy: {
+        nome: 'asc',
+      },
+    });
+
+    return condominios;
   }
 }
