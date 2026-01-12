@@ -8,12 +8,13 @@ import { ProfilesModule } from './profiles/profiles.module';
 import { SalesModule } from './sales/sales.module';
 import { AuthModule } from './auth/auth.module';
 import { CondominioModule } from './condominio/condominio.module';
+import { EmpresasModule } from './empresas/empresas.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
 
 @Module({
-  imports: [PrismaModule, UsersModule, ProfilesModule, SalesModule, AuthModule, CondominioModule],
+  imports: [PrismaModule, UsersModule, ProfilesModule, SalesModule, AuthModule, CondominioModule, EmpresasModule],
   controllers: [AppController, DashboardController],
   providers: [
     AppService,

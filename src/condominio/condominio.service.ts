@@ -27,8 +27,23 @@ import { CreateMoradorDto, UpdateMoradorDto } from './dto/morador.dto';
 export class CondominioService {
   constructor(private prisma: PrismaService) {}
 
+  // Método auxiliar para obter empresaId do usuário
+  private async getEmpresaId(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { empresaId: true, perfilId: true },
+    });
+    // SuperAdmin tem empresaId null (não importa o perfilId)
+    return user?.empresaId || null;
+  }
+
   // ========== UNIDADES ==========
-  async createUnidade(userId: string, createUnidadeDto: CreateUnidadeDto) {
+  async createUnidade(userId: string, createUnidadeDto: CreateUnidadeDto, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     // Se tiver moradorId, verificar se o morador pertence ao condomínio
     if (createUnidadeDto.moradorId) {
       const morador = await this.prisma.user.findUnique({
@@ -45,6 +60,7 @@ export class CondominioService {
       data: {
         ...createUnidadeDto,
         userId,
+        empresaId: empresaId!,
       },
       include: {
         morador: true,
@@ -57,11 +73,23 @@ export class CondominioService {
     page: number = 1,
     limit: number = 10,
     search: string = '',
+    empresaId: string | null = null,
   ) {
     const skip = (page - 1) * limit;
 
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
+    const where: any = { userId };
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
+
     let allUnidades = await this.prisma.unidade.findMany({
-      where: { userId },
+      where,
       include: {
         morador: {
           select: {
@@ -95,7 +123,12 @@ export class CondominioService {
     };
   }
 
-  async findOneUnidade(userId: string, id: string) {
+  async findOneUnidade(userId: string, id: string, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const unidade = await this.prisma.unidade.findUnique({
       where: { id },
       include: {
@@ -117,6 +150,13 @@ export class CondominioService {
     }
 
     if (unidade.userId !== userId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta unidade',
+      );
+    }
+
+    // Verificar isolamento por empresa (exceto SuperAdmin)
+    if (empresaId && unidade.empresaId !== empresaId) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar esta unidade',
       );
@@ -172,7 +212,13 @@ export class CondominioService {
   async createContaPagar(
     userId: string,
     createContaPagarDto: CreateContaPagarDto,
+    empresaId: string | null = null,
   ) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     // Se tiver unidadeId, verificar se a unidade pertence ao usuário
     if (createContaPagarDto.unidadeId) {
       const unidade = await this.prisma.unidade.findUnique({
@@ -190,6 +236,7 @@ export class CondominioService {
         ...createContaPagarDto,
         vencimento: new Date(createContaPagarDto.vencimento),
         userId,
+        empresaId: empresaId!,
       },
     });
   }
@@ -200,16 +247,27 @@ export class CondominioService {
     limit: number = 10,
     mes?: number,
     ano?: number,
+    empresaId: string | null = null,
   ) {
     const skip = (page - 1) * limit;
+
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
 
     const where: {
       userId: string;
       mes?: number;
       ano?: number;
+      empresaId?: string;
     } = { userId };
     if (mes !== undefined) where.mes = mes;
     if (ano !== undefined) where.ano = ano;
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.contaPagar.findMany({
@@ -232,7 +290,12 @@ export class CondominioService {
     };
   }
 
-  async findOneContaPagar(userId: string, id: string) {
+  async findOneContaPagar(userId: string, id: string, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const contaPagar = await this.prisma.contaPagar.findUnique({
       where: { id },
       include: {
@@ -245,6 +308,13 @@ export class CondominioService {
     }
 
     if (contaPagar.userId !== userId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta conta a pagar',
+      );
+    }
+
+    // Verificar isolamento por empresa (exceto SuperAdmin)
+    if (empresaId && contaPagar.empresaId !== empresaId) {
       throw new ForbiddenException(
         'Você não tem permissão para acessar esta conta a pagar',
       );
@@ -327,7 +397,12 @@ export class CondominioService {
   }
 
   // ========== BOLETOS ==========
-  async createBoleto(userId: string, createBoletoDto: CreateBoletoDto) {
+  async createBoleto(userId: string, createBoletoDto: CreateBoletoDto, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     // Verificar se a unidade pertence ao usuário
     const unidade = await this.prisma.unidade.findUnique({
       where: { id: createBoletoDto.unidadeId },
@@ -354,12 +429,14 @@ export class CondominioService {
       dataPagamento?: Date;
       observacoes?: string;
       userId: string;
+      empresaId: string;
     } = {
       unidadeId: createBoletoDto.unidadeId,
       descricao: createBoletoDto.descricao,
       valor: createBoletoDto.valor,
       vencimento: new Date(createBoletoDto.vencimento),
       userId,
+      empresaId: empresaId!,
     };
 
     if (arquivoPdf) {
@@ -664,27 +741,44 @@ export class CondominioService {
   }
 
   // ========== REUNIÕES ==========
-  async createReuniao(userId: string, createReuniaoDto: CreateReuniaoDto) {
+  async createReuniao(userId: string, createReuniaoDto: CreateReuniaoDto, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     return this.prisma.reuniao.create({
       data: {
         ...createReuniaoDto,
         data: new Date(createReuniaoDto.data),
         userId,
+        empresaId: empresaId!,
       },
     });
   }
 
-  async findAllReunioes(userId: string, page: number = 1, limit: number = 10) {
+  async findAllReunioes(userId: string, page: number = 1, limit: number = 10, empresaId: string | null = null) {
     const skip = (page - 1) * limit;
+
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
+    const where: any = { userId };
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.reuniao.findMany({
-        where: { userId },
+        where,
         orderBy: { data: 'asc' },
         skip,
         take: limit,
       }),
-      this.prisma.reuniao.count({ where: { userId } }),
+      this.prisma.reuniao.count({ where }),
     ]);
 
     return {
@@ -695,7 +789,12 @@ export class CondominioService {
     };
   }
 
-  async findOneReuniao(userId: string, id: string) {
+  async findOneReuniao(userId: string, id: string, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const reuniao = await this.prisma.reuniao.findUnique({
       where: { id },
     });
@@ -710,6 +809,13 @@ export class CondominioService {
       );
     }
 
+    // Validar isolamento por empresaId (se não for SuperAdmin)
+    if (empresaId && reuniao.empresaId !== empresaId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta reunião',
+      );
+    }
+
     return reuniao;
   }
 
@@ -717,8 +823,9 @@ export class CondominioService {
     userId: string,
     id: string,
     updateReuniaoDto: UpdateReuniaoDto,
+    empresaId: string | null = null,
   ) {
-    await this.findOneReuniao(userId, id); // Valida existência e permissão
+    await this.findOneReuniao(userId, id, empresaId); // Valida existência e permissão
 
     const data: {
       titulo?: string;
@@ -758,8 +865,8 @@ export class CondominioService {
     });
   }
 
-  async removeReuniao(userId: string, id: string) {
-    await this.findOneReuniao(userId, id); // Valida existência e permissão
+  async removeReuniao(userId: string, id: string, empresaId: string | null = null) {
+    await this.findOneReuniao(userId, id, empresaId); // Valida existência e permissão
 
     return this.prisma.reuniao.delete({
       where: { id },
@@ -767,7 +874,12 @@ export class CondominioService {
   }
 
   // ========== AVISOS ==========
-  async createAviso(userId: string, createAvisoDto: CreateAvisoDto) {
+  async createAviso(userId: string, createAvisoDto: CreateAvisoDto, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const data: {
       titulo: string;
       descricao: string;
@@ -776,11 +888,13 @@ export class CondominioService {
       dataFim?: Date;
       destaque?: boolean;
       userId: string;
+      empresaId: string;
     } = {
       titulo: createAvisoDto.titulo,
       descricao: createAvisoDto.descricao,
       dataInicio: new Date(createAvisoDto.dataInicio),
       userId,
+      empresaId: empresaId!,
     };
 
     if (createAvisoDto.tipo !== undefined) {
@@ -798,8 +912,13 @@ export class CondominioService {
     });
   }
 
-  async findAllAvisos(userId: string, page: number = 1, limit: number = 10) {
+  async findAllAvisos(userId: string, page: number = 1, limit: number = 10, empresaId: string | null = null) {
     const skip = (page - 1) * limit;
+
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
 
     // Buscar o usuário para verificar o perfil
     const user = await this.prisma.user.findUnique({
@@ -838,6 +957,11 @@ export class CondominioService {
       avisosWhere = { userId };
     }
 
+    // Adicionar filtro por empresaId (se não for SuperAdmin)
+    if (empresaId) {
+      avisosWhere.empresaId = empresaId;
+    }
+
     const [avisos, total] = await Promise.all([
       this.prisma.aviso.findMany({
         where: avisosWhere,
@@ -871,7 +995,12 @@ export class CondominioService {
     };
   }
 
-  async findOneAviso(userId: string, id: string) {
+  async findOneAviso(userId: string, id: string, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const aviso = await this.prisma.aviso.findUnique({
       where: { id },
     });
@@ -886,6 +1015,13 @@ export class CondominioService {
       );
     }
 
+    // Validar isolamento por empresaId (se não for SuperAdmin)
+    if (empresaId && aviso.empresaId !== empresaId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar este aviso',
+      );
+    }
+
     return aviso;
   }
 
@@ -893,8 +1029,9 @@ export class CondominioService {
     userId: string,
     id: string,
     updateAvisoDto: UpdateAvisoDto,
+    empresaId: string | null = null,
   ) {
-    await this.findOneAviso(userId, id); // Valida existência e permissão
+    await this.findOneAviso(userId, id, empresaId); // Valida existência e permissão
 
     const data: {
       titulo?: string;
@@ -930,8 +1067,8 @@ export class CondominioService {
     });
   }
 
-  async removeAviso(userId: string, id: string) {
-    await this.findOneAviso(userId, id); // Valida existência e permissão
+  async removeAviso(userId: string, id: string, empresaId: string | null = null) {
+    await this.findOneAviso(userId, id, empresaId); // Valida existência e permissão
 
     return this.prisma.aviso.delete({
       where: { id },
@@ -1301,12 +1438,19 @@ export class CondominioService {
   async createBalanceteMovimentacao(
     userId: string,
     createBalanceteMovimentacaoDto: CreateBalanceteMovimentacaoDto,
+    empresaId: string | null = null,
   ) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     return this.prisma.balanceteMovimentacao.create({
       data: {
         ...createBalanceteMovimentacaoDto,
         data: new Date(createBalanceteMovimentacaoDto.data),
         userId,
+        empresaId: empresaId!,
       },
     });
   }
@@ -1316,14 +1460,21 @@ export class CondominioService {
     page: number = 1,
     limit: number = 10,
     tipo?: string,
+    empresaId: string | null = null,
   ) {
     const skip = (page - 1) * limit;
 
-    const where: {
-      userId: string;
-      tipo?: string;
-    } = { userId };
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
+    const where: any = { userId };
     if (tipo) where.tipo = tipo;
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.balanceteMovimentacao.findMany({
@@ -1343,7 +1494,12 @@ export class CondominioService {
     };
   }
 
-  async findOneBalanceteMovimentacao(userId: string, id: string) {
+  async findOneBalanceteMovimentacao(userId: string, id: string, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
     const movimentacao = await this.prisma.balanceteMovimentacao.findUnique({
       where: { id },
     });
@@ -1360,6 +1516,13 @@ export class CondominioService {
       );
     }
 
+    // Validar isolamento por empresaId (se não for SuperAdmin)
+    if (empresaId && movimentacao.empresaId !== empresaId) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta movimentação',
+      );
+    }
+
     return movimentacao;
   }
 
@@ -1367,8 +1530,9 @@ export class CondominioService {
     userId: string,
     id: string,
     updateBalanceteMovimentacaoDto: UpdateBalanceteMovimentacaoDto,
+    empresaId: string | null = null,
   ) {
-    const movimentacao = await this.findOneBalanceteMovimentacao(userId, id);
+    const movimentacao = await this.findOneBalanceteMovimentacao(userId, id, empresaId);
 
     const data: {
       tipo?: string;
@@ -1396,8 +1560,8 @@ export class CondominioService {
     });
   }
 
-  async removeBalanceteMovimentacao(userId: string, id: string) {
-    await this.findOneBalanceteMovimentacao(userId, id);
+  async removeBalanceteMovimentacao(userId: string, id: string, empresaId: string | null = null) {
+    await this.findOneBalanceteMovimentacao(userId, id, empresaId);
 
     return this.prisma.balanceteMovimentacao.delete({
       where: { id },
@@ -1405,21 +1569,34 @@ export class CondominioService {
   }
 
   // ========== BALANCETE ==========
-  async getBalancete(userId: string, mes?: number, ano?: number) {
-    const where: {
-      userId: string;
-      mes?: number;
-      ano?: number;
-    } = { userId };
-    if (mes !== undefined) where.mes = mes;
-    if (ano !== undefined) where.ano = ano;
+  async getBalancete(userId: string, mes?: number, ano?: number, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
+    const whereContasPagar: any = { userId };
+    if (mes !== undefined) whereContasPagar.mes = mes;
+    if (ano !== undefined) whereContasPagar.ano = ano;
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      whereContasPagar.empresaId = empresaId;
+    }
+
+    const whereBoletos: any = { userId };
+    if (mes !== undefined) whereBoletos.mes = mes;
+    if (ano !== undefined) whereBoletos.ano = ano;
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (empresaId) {
+      whereBoletos.empresaId = empresaId;
+    }
 
     const contasPagar = await this.prisma.contaPagar.findMany({
-      where,
+      where: whereContasPagar,
     });
 
     const boletos = await this.prisma.boleto.findMany({
-      where,
+      where: whereBoletos,
       include: {
         unidade: true,
       },

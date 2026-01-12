@@ -20,6 +20,8 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UserResponseDto, ChangePasswordDto } from './dto/user.dto';
 import { Public } from '../auth/public.decorator';
+import type { Request } from 'express';
+import type { AuthUser } from '../auth/types/auth-user.interface';
 
 @ApiTags('users')
 @ApiBearerAuth('access-token')
@@ -27,7 +29,6 @@ import { Public } from '../auth/public.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Public()
   @Post()
   @ApiOperation({ summary: 'Criar um novo usuário' })
   @ApiResponse({
@@ -35,8 +36,11 @@ export class UsersController {
     description: 'Usuário criado com sucesso.',
     type: UserResponseDto,
   })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createUserDto: CreateUserDto, @Req() req: Request) {
+    const user = req.user as AuthUser;
+    const empresaIdFromAuth = user.empresaId || null;
+    const isSuperAdminAuth = user.isSuperAdmin || false;
+    return this.usersService.create(createUserDto, empresaIdFromAuth, isSuperAdminAuth);
   }
 
   @Get()
@@ -47,15 +51,19 @@ export class UsersController {
     type: [UserResponseDto],
   })
   findAll(
+    @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('search') search?: string,
   ) {
+    const user = req.user as AuthUser;
+    const empresaId = user.empresaId || null;
+    const isSuperAdmin = user.isSuperAdmin || false;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const searchTerm = search || '';
     
-    return this.usersService.findAll(pageNumber, limit, searchTerm);
+    return this.usersService.findAll(pageNumber, limit, searchTerm, empresaId, isSuperAdmin);
   }
 
   @Get('condominios/list')
@@ -64,8 +72,11 @@ export class UsersController {
     status: HttpStatus.OK,
     description: 'Lista de condomínios.',
   })
-  async findAllCondominios() {
-    return this.usersService.findAllCondominios();
+  async findAllCondominios(@Req() req: Request) {
+    const user = req.user as AuthUser;
+    const empresaId = user.empresaId || null;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    return this.usersService.findAllCondominios(empresaId, isSuperAdmin);
   }
 
   @Get(':id')
@@ -79,8 +90,11 @@ export class UsersController {
     status: HttpStatus.NOT_FOUND,
     description: 'Usuário não encontrado.',
   })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as AuthUser;
+    const empresaId = user.empresaId || null;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    return this.usersService.findOne(id, empresaId, isSuperAdmin);
   }
 
   @Patch(':id')
@@ -94,8 +108,11 @@ export class UsersController {
     status: HttpStatus.NOT_FOUND,
     description: 'Usuário não encontrado.',
   })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Req() req: Request) {
+    const user = req.user as AuthUser;
+    const empresaIdFromAuth = user.empresaId || null;
+    const isSuperAdminAuth = user.isSuperAdmin || false;
+    return this.usersService.update(id, updateUserDto, empresaIdFromAuth, isSuperAdminAuth);
   }
 
   @Delete(':id')

@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/auth.dto';
 
 interface UserWithoutPassword {
@@ -12,6 +13,7 @@ interface UserWithoutPassword {
   cep: string | null;
   avatar: string | null;
   resetCode: string | null;
+  empresaId: string | null;
   createdAt: Date;
   updatedAt: Date;
   perfil?: {
@@ -25,6 +27,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private prisma: PrismaService,
   ) {}
 
   async validateUser(
@@ -48,12 +51,30 @@ export class AuthService {
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
+    // Verificar se é SuperAdmin (perfilId === 99)
+    const isSuperAdmin = user.perfilId === 99;
+
+    // Se não for SuperAdmin, verificar se a empresa está ativa
+    if (!isSuperAdmin && user.empresaId) {
+      const empresa = await this.prisma.empresa.findUnique({
+        where: { id: user.empresaId },
+      });
+      
+      if (!empresa || !empresa.ativa) {
+        throw new UnauthorizedException(
+          'Sua licença está inativa. Entre em contato com o administrador.',
+        );
+      }
+    }
+
     const payload = {
       email: user.email,
       sub: user.id,
       perfilId: user.perfilId,
       nome: user.nome,
       avatar: user.avatar,
+      empresaId: user.empresaId || null,
+      isSuperAdmin,
     };
 
     return {
@@ -66,6 +87,8 @@ export class AuthService {
         perfil: user.perfil,
         avatar: user.avatar,
         cep: user.cep,
+        empresaId: user.empresaId || null,
+        isSuperAdmin,
       },
     };
   }

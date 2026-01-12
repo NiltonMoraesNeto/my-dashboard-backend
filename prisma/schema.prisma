@@ -10,6 +10,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Empresa {
+  id          String    @id @default(cuid())
+  nome        String
+  cnpj        String?   @unique
+  email       String?
+  telefone    String?
+  ativa       Boolean   @default(true)
+  dataInicio  DateTime  @default(now())
+  dataFim     DateTime?
+  observacoes String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  usuarios               User[]
+  unidades               Unidade[]
+  contasPagar            ContaPagar[]
+  boletos                Boleto[]
+  reunioes               Reuniao[]
+  avisos                 Aviso[]
+  balanceteMovimentacoes BalanceteMovimentacao[]
+
+  @@index([ativa])
+  @@map("empresas")
+}
+
 model User {
   id           String   @id @default(cuid())
   nome         String
@@ -20,12 +45,14 @@ model User {
   avatar       String?
   resetCode    String?
   condominioId String? // ID do condomínio que criou este morador (null para usuários normais)
+  empresaId    String? // ID da empresa (null para SuperAdmin)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  perfil     Profile @relation(fields: [perfilId], references: [id])
-  condominio User?   @relation("CondominioMoradores", fields: [condominioId], references: [id])
-  moradores  User[]  @relation("CondominioMoradores")
+  perfil     Profile  @relation(fields: [perfilId], references: [id])
+  condominio User?    @relation("CondominioMoradores", fields: [condominioId], references: [id])
+  moradores  User[]   @relation("CondominioMoradores")
+  empresa    Empresa? @relation(fields: [empresaId], references: [id])
 
   unidades               Unidade[]
   unidadesComoMorador    Unidade[]               @relation("UnidadeMorador")
@@ -78,14 +105,17 @@ model Unidade {
   email        String?
   userId       String // Usuário do condomínio (dono/gestor)
   moradorId    String? // Usuário morador vinculado ao apto
+  empresaId    String? // ID da empresa (para isolamento de dados) - nullable para migração
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   user        User         @relation(fields: [userId], references: [id])
   morador     User?        @relation("UnidadeMorador", fields: [moradorId], references: [id])
+  empresa     Empresa?     @relation(fields: [empresaId], references: [id])
   boletos     Boleto[]
   contasPagar ContaPagar[]
 
+  @@index([empresaId])
   @@map("unidades")
 }
 
@@ -100,13 +130,16 @@ model ContaPagar {
   status      String   @default("Pendente") // "Pendente", "Paga", "Vencida"
   unidadeId   String?
   userId      String // Usuário do condomínio
+  empresaId   String? // ID da empresa (para isolamento de dados) - nullable para migração
   observacoes String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user    User     @relation(fields: [userId], references: [id])
   unidade Unidade? @relation(fields: [unidadeId], references: [id])
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
 
+  @@index([empresaId])
   @@map("contasPagar")
 }
 
@@ -120,13 +153,16 @@ model Boleto {
   status        String    @default("Pendente") // "Pendente", "Pago", "Vencido", "Cancelado"
   dataPagamento DateTime?
   userId        String // Usuário do condomínio
+  empresaId     String? // ID da empresa (para isolamento de dados) - nullable para migração
   observacoes   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id])
-  unidade Unidade @relation(fields: [unidadeId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  unidade Unidade  @relation(fields: [unidadeId], references: [id])
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
 
+  @@index([empresaId])
   @@map("boletos")
 }
 
@@ -140,11 +176,14 @@ model Reuniao {
   pauta     String?
   status    String   @default("Agendada") // "Agendada", "Realizada", "Cancelada"
   userId    String // Usuário do condomínio
+  empresaId String? // ID da empresa (para isolamento de dados) - nullable para migração
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
 
+  @@index([empresaId])
   @@map("reunioes")
 }
 
@@ -157,12 +196,15 @@ model Aviso {
   dataFim    DateTime?
   destaque   Boolean   @default(false)
   userId     String // Usuário do condomínio
+  empresaId  String? // ID da empresa (para isolamento de dados) - nullable para migração
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
   user     User           @relation(fields: [userId], references: [id])
+  empresa  Empresa?       @relation(fields: [empresaId], references: [id])
   leituras AvisoLeitura[]
 
+  @@index([empresaId])
   @@map("avisos")
 }
 
@@ -188,10 +230,13 @@ model BalanceteMovimentacao {
   valor     Float
   motivo    String
   userId    String // Usuário do condomínio
+  empresaId String? // ID da empresa (para isolamento de dados) - nullable para migração
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
 
+  @@index([empresaId])
   @@map("balancete_movimentacao")
 }

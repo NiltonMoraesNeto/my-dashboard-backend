@@ -10,13 +10,14 @@ async function main() {
   console.log('📋 Seeding profiles...');
   const profiles = [
     { id: 1, descricao: 'Adminstrador' },
-    { id: 2, descricao: 'RH' },
-    { id: 3, descricao: 'Financeiro' },
-    { id: 4, descricao: 'Compras' },
-    { id: 5, descricao: 'Vendas' },
-    { id: 6, descricao: 'Usuário' },
-    { id: 7, descricao: 'Condomínio' },
-    { id: 8, descricao: 'Morador' },
+    { id: 3, descricao: 'RH' },
+    { id: 4, descricao: 'Financeiro' },
+    { id: 5, descricao: 'Compras' },
+    { id: 6, descricao: 'Vendas' },
+    { id: 7, descricao: 'Usuário' },
+    { id: 8, descricao: 'Condomínio' },
+    { id: 9, descricao: 'Morador' },
+    { id: 99, descricao: 'SuperAdmin' },
   ];
 
   for (const profile of profiles) {
@@ -27,21 +28,40 @@ async function main() {
     });
   }
 
+  // Seed Empresa Padrão (para migração de dados existentes)
+  console.log('🏢 Seeding empresa padrão...');
+  const empresaPadrao = await prisma.empresa.upsert({
+    where: { id: 'empresa-padrao-id' },
+    update: {},
+    create: {
+      id: 'empresa-padrao-id',
+      nome: 'Empresa Padrão',
+      cnpj: null,
+      email: 'contato@empresapadrao.com',
+      telefone: null,
+      ativa: true,
+      observacoes: 'Empresa criada automaticamente para migração de dados existentes',
+    },
+  });
+
   // Seed Users
   console.log('👥 Seeding users...');
-  const hashedPassword = await bcrypt.hash('senha123', 10);
+  const hashedPassword = await bcrypt.hash('Aladar100%', 10);
   await prisma.user.upsert({
     where: { email: 'nilton@nilton.com' },
-    update: {},
+    update: {
+      empresaId: null, // SuperAdmin não tem empresaId (empresaId null = SuperAdmin)
+    },
     create: {
       nome: 'Nilton Moraes Neto',
       email: 'nilton@nilton.com',
       password: hashedPassword,
-      perfilId: 1,
+      perfilId: 1, // SuperAdmin
       cep: '80000000',
       avatar:
         'https://upload.wikimedia.org/wikipedia/commons/2/22/Logo_Flamengo_crest_1980-2018.png',
       resetCode: '',
+      empresaId: null, // SuperAdmin não tem empresaId
     },
   });
 

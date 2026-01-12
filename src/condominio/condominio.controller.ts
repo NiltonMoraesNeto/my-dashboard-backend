@@ -8,16 +8,15 @@ import {
   Delete,
   HttpStatus,
   Query,
-  ParseIntPipe,
   Req,
   UseInterceptors,
   UploadedFile,
   Res,
-  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { Request } from 'express';
+import type { AuthUser } from '../auth/types/auth-user.interface';
 import {
   ApiTags,
   ApiOperation,
@@ -51,10 +50,7 @@ import {
   UpdateAvisoDto,
   AvisoResponseDto,
 } from './dto/aviso.dto';
-import {
-  BalanceteResponseDto,
-  BalanceteQueryDto,
-} from './dto/balancete.dto';
+import { BalanceteResponseDto } from './dto/balancete.dto';
 import {
   CreateBalanceteMovimentacaoDto,
   UpdateBalanceteMovimentacaoDto,
@@ -80,9 +76,18 @@ export class CondominioController {
     description: 'Unidade criada com sucesso.',
     type: UnidadeResponseDto,
   })
-  createUnidade(@Req() req: Request, @Body() createUnidadeDto: CreateUnidadeDto) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.createUnidade(userId, createUnidadeDto);
+  createUnidade(
+    @Req() req: Request,
+    @Body() createUnidadeDto: CreateUnidadeDto,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.createUnidade(
+      userId,
+      createUnidadeDto,
+      empresaId,
+    );
   }
 
   @Get('unidades')
@@ -101,12 +106,20 @@ export class CondominioController {
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('search') search?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const searchTerm = search || '';
-    
-    return this.condominioService.findAllUnidades(userId, pageNumber, limit, searchTerm);
+
+    return this.condominioService.findAllUnidades(
+      userId,
+      pageNumber,
+      limit,
+      searchTerm,
+      empresaId,
+    );
   }
 
   @Get('unidades/:id')
@@ -121,7 +134,8 @@ export class CondominioController {
     description: 'Unidade não encontrada.',
   })
   findOneUnidade(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.findOneUnidade(userId, id);
   }
 
@@ -137,7 +151,8 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateUnidadeDto: UpdateUnidadeDto,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.updateUnidade(userId, id, updateUnidadeDto);
   }
 
@@ -148,7 +163,8 @@ export class CondominioController {
     description: 'Unidade excluída com sucesso.',
   })
   removeUnidade(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.removeUnidade(userId, id);
   }
 
@@ -160,8 +176,12 @@ export class CondominioController {
     description: 'Conta a pagar criada com sucesso.',
     type: ContaPagarResponseDto,
   })
-  createContaPagar(@Req() req: Request, @Body() createContaPagarDto: CreateContaPagarDto) {
-    const userId = (req.user as any).userId;
+  createContaPagar(
+    @Req() req: Request,
+    @Body() createContaPagarDto: CreateContaPagarDto,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.createContaPagar(userId, createContaPagarDto);
   }
 
@@ -183,12 +203,13 @@ export class CondominioController {
     @Query('mes') mes?: string,
     @Query('ano') ano?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const mesNumber = mes ? parseInt(mes, 10) : undefined;
     const anoNumber = ano ? parseInt(ano, 10) : undefined;
-    
+
     return this.condominioService.findAllContasPagar(
       userId,
       pageNumber,
@@ -206,7 +227,8 @@ export class CondominioController {
     type: ContaPagarResponseDto,
   })
   findOneContaPagar(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.findOneContaPagar(userId, id);
   }
 
@@ -222,8 +244,13 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateContaPagarDto: UpdateContaPagarDto,
   ) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.updateContaPagar(userId, id, updateContaPagarDto);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    return this.condominioService.updateContaPagar(
+      userId,
+      id,
+      updateContaPagarDto,
+    );
   }
 
   @Delete('contas-pagar/:id')
@@ -233,7 +260,8 @@ export class CondominioController {
     description: 'Conta a pagar excluída com sucesso.',
   })
   removeContaPagar(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.removeContaPagar(userId, id);
   }
 
@@ -251,7 +279,8 @@ export class CondominioController {
     @Body() createBoletoDto: CreateBoletoDto,
     @UploadedFile() arquivo?: Express.Multer.File,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     createBoletoDto.arquivo = arquivo;
     return this.condominioService.createBoleto(userId, createBoletoDto);
   }
@@ -272,10 +301,11 @@ export class CondominioController {
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('unidadeId') unidadeId?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
-    
+
     return this.condominioService.findAllBoletos(
       userId,
       pageNumber,
@@ -292,7 +322,8 @@ export class CondominioController {
     type: BoletoResponseDto,
   })
   findOneBoleto(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.findOneBoleto(userId, id);
   }
 
@@ -310,7 +341,8 @@ export class CondominioController {
     @Body() updateBoletoDto: UpdateBoletoDto,
     @UploadedFile() arquivo?: Express.Multer.File,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     updateBoletoDto.arquivo = arquivo;
     return this.condominioService.updateBoleto(userId, id, updateBoletoDto);
   }
@@ -334,9 +366,10 @@ export class CondominioController {
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     const filePath = await this.condominioService.getBoletoPdfPath(userId, id);
-    
+
     if (!filePath) {
       return res.status(HttpStatus.NOT_FOUND).json({
         message: 'Arquivo PDF não encontrado',
@@ -358,7 +391,8 @@ export class CondominioController {
     description: 'Boleto excluído com sucesso.',
   })
   removeBoleto(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.removeBoleto(userId, id);
   }
 
@@ -370,9 +404,18 @@ export class CondominioController {
     description: 'Reunião criada com sucesso.',
     type: ReuniaoResponseDto,
   })
-  createReuniao(@Req() req: Request, @Body() createReuniaoDto: CreateReuniaoDto) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.createReuniao(userId, createReuniaoDto);
+  createReuniao(
+    @Req() req: Request,
+    @Body() createReuniaoDto: CreateReuniaoDto,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.createReuniao(
+      userId,
+      createReuniaoDto,
+      empresaId,
+    );
   }
 
   @Get('reunioes')
@@ -389,11 +432,18 @@ export class CondominioController {
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
-    
-    return this.condominioService.findAllReunioes(userId, pageNumber, limit);
+
+    return this.condominioService.findAllReunioes(
+      userId,
+      pageNumber,
+      limit,
+      empresaId,
+    );
   }
 
   @Get('reunioes/:id')
@@ -404,8 +454,10 @@ export class CondominioController {
     type: ReuniaoResponseDto,
   })
   findOneReuniao(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.findOneReuniao(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.findOneReuniao(userId, id, empresaId);
   }
 
   @Patch('reunioes/:id')
@@ -420,8 +472,16 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateReuniaoDto: UpdateReuniaoDto,
   ) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.updateReuniao(userId, id, updateReuniaoDto);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    // findOneReuniao será chamado dentro de updateReuniao e validará empresaId
+    return this.condominioService.updateReuniao(
+      userId,
+      id,
+      updateReuniaoDto,
+      empresaId,
+    );
   }
 
   @Delete('reunioes/:id')
@@ -431,8 +491,11 @@ export class CondominioController {
     description: 'Reunião excluída com sucesso.',
   })
   removeReuniao(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.removeReuniao(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    // findOneReuniao será chamado dentro de removeReuniao e validará empresaId
+    return this.condominioService.removeReuniao(userId, id, empresaId);
   }
 
   // ========== AVISOS ==========
@@ -444,8 +507,14 @@ export class CondominioController {
     type: AvisoResponseDto,
   })
   createAviso(@Req() req: Request, @Body() createAvisoDto: CreateAvisoDto) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.createAviso(userId, createAvisoDto);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.createAviso(
+      userId,
+      createAvisoDto,
+      empresaId,
+    );
   }
 
   @Get('avisos')
@@ -462,11 +531,18 @@ export class CondominioController {
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
-    
-    return this.condominioService.findAllAvisos(userId, pageNumber, limit);
+
+    return this.condominioService.findAllAvisos(
+      userId,
+      pageNumber,
+      limit,
+      empresaId,
+    );
   }
 
   @Get('avisos/:id')
@@ -477,8 +553,10 @@ export class CondominioController {
     type: AvisoResponseDto,
   })
   findOneAviso(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.findOneAviso(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.findOneAviso(userId, id, empresaId);
   }
 
   @Patch('avisos/:id')
@@ -493,7 +571,8 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateAvisoDto: UpdateAvisoDto,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.updateAviso(userId, id, updateAvisoDto);
   }
 
@@ -504,8 +583,11 @@ export class CondominioController {
     description: 'Aviso excluído com sucesso.',
   })
   removeAviso(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.removeAviso(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    // findOneAviso será chamado dentro de removeAviso e validará empresaId
+    return this.condominioService.removeAviso(userId, id, empresaId);
   }
 
   @Get('avisos/nao-lidos/count')
@@ -515,7 +597,8 @@ export class CondominioController {
     description: 'Contador de avisos não lidos.',
   })
   countAvisosNaoLidos(@Req() req: Request) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.countAvisosNaoLidos(userId);
   }
 
@@ -526,7 +609,8 @@ export class CondominioController {
     description: 'Aviso marcado como lido.',
   })
   marcarAvisoComoLido(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.marcarAvisoComoLido(userId, id);
   }
 
@@ -538,8 +622,12 @@ export class CondominioController {
     description: 'Morador criado com sucesso.',
     type: MoradorResponseDto,
   })
-  createMorador(@Req() req: Request, @Body() createMoradorDto: CreateMoradorDto) {
-    const userId = (req.user as any).userId;
+  createMorador(
+    @Req() req: Request,
+    @Body() createMoradorDto: CreateMoradorDto,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.createMorador(userId, createMoradorDto);
   }
 
@@ -559,12 +647,18 @@ export class CondominioController {
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('search') search?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const searchTerm = search || '';
-    
-    return this.condominioService.findAllMoradores(userId, pageNumber, limit, searchTerm);
+
+    return this.condominioService.findAllMoradores(
+      userId,
+      pageNumber,
+      limit,
+      searchTerm,
+    );
   }
 
   @Get('moradores/:id')
@@ -575,7 +669,8 @@ export class CondominioController {
     type: MoradorResponseDto,
   })
   findOneMorador(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.findOneMorador(userId, id);
   }
 
@@ -591,7 +686,8 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateMoradorDto: UpdateMoradorDto,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.updateMorador(userId, id, updateMoradorDto);
   }
 
@@ -602,7 +698,8 @@ export class CondominioController {
     description: 'Morador excluído com sucesso.',
   })
   removeMorador(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
     return this.condominioService.removeMorador(userId, id);
   }
 
@@ -618,10 +715,13 @@ export class CondominioController {
     @Req() req: Request,
     @Body() createBalanceteMovimentacaoDto: CreateBalanceteMovimentacaoDto,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     return this.condominioService.createBalanceteMovimentacao(
       userId,
       createBalanceteMovimentacaoDto,
+      empresaId,
     );
   }
 
@@ -641,7 +741,9 @@ export class CondominioController {
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('tipo') tipo?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
 
@@ -650,6 +752,7 @@ export class CondominioController {
       pageNumber,
       limit,
       tipo,
+      empresaId,
     );
   }
 
@@ -661,8 +764,14 @@ export class CondominioController {
     type: BalanceteMovimentacaoResponseDto,
   })
   findOneBalanceteMovimentacao(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.findOneBalanceteMovimentacao(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    return this.condominioService.findOneBalanceteMovimentacao(
+      userId,
+      id,
+      empresaId,
+    );
   }
 
   @Patch('balancete/movimentacoes/:id')
@@ -677,11 +786,15 @@ export class CondominioController {
     @Param('id') id: string,
     @Body() updateBalanceteMovimentacaoDto: UpdateBalanceteMovimentacaoDto,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    // findOneBalanceteMovimentacao será chamado dentro de updateBalanceteMovimentacao e validará empresaId
     return this.condominioService.updateBalanceteMovimentacao(
       userId,
       id,
       updateBalanceteMovimentacaoDto,
+      empresaId,
     );
   }
 
@@ -692,8 +805,15 @@ export class CondominioController {
     description: 'Movimentação excluída com sucesso.',
   })
   removeBalanceteMovimentacao(@Req() req: Request, @Param('id') id: string) {
-    const userId = (req.user as any).userId;
-    return this.condominioService.removeBalanceteMovimentacao(userId, id);
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    // findOneBalanceteMovimentacao será chamado dentro de removeBalanceteMovimentacao e validará empresaId
+    return this.condominioService.removeBalanceteMovimentacao(
+      userId,
+      id,
+      empresaId,
+    );
   }
 
   // ========== BALANCETE ==========
@@ -711,10 +831,17 @@ export class CondominioController {
     @Query('mes') mes?: string,
     @Query('ano') ano?: string,
   ) {
-    const userId = (req.user as any).userId;
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
     const mesNumber = mes ? parseInt(mes, 10) : undefined;
     const anoNumber = ano ? parseInt(ano, 10) : undefined;
-    
-    return this.condominioService.getBalancete(userId, mesNumber, anoNumber);
+
+    return this.condominioService.getBalancete(
+      userId,
+      mesNumber,
+      anoNumber,
+      empresaId,
+    );
   }
 }

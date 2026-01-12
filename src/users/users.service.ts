@@ -7,7 +7,7 @@ import * as bcrypt from 'bcryptjs';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto, empresaIdFromAuth?: string | null, isSuperAdminAuth?: boolean) {
     // Buscar perfis para validação
     const allProfiles = await this.prisma.profile.findMany();
     const perfilMorador = allProfiles.find((p) =>
@@ -45,12 +45,28 @@ export class UsersService {
       }
     }
 
+    // Lógica de empresaId:
+    // - Se for SuperAdmin (isSuperAdminAuth === true): usa empresaId do DTO (pode ser null)
+    // - Se não for SuperAdmin: usa empresaId do usuário autenticado (empresaIdFromAuth)
+    let empresaIdFinal: string | null | undefined = undefined;
+    if (isSuperAdminAuth) {
+      // SuperAdmin pode escolher a empresa (ou null)
+      // Se empresaId for string vazia ou undefined, usar null
+      empresaIdFinal = (createUserDto.empresaId && createUserDto.empresaId.trim() !== '') 
+        ? createUserDto.empresaId 
+        : null;
+    } else {
+      // Não-SuperAdmin usa a empresa do usuário autenticado
+      empresaIdFinal = empresaIdFromAuth || null;
+    }
+
     // Hash password before saving
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
     const user = await this.prisma.user.create({
       data: {
         ...createUserDto,
+        empresaId: empresaIdFinal,
         password: hashedPassword,
       },
       include: {
@@ -64,11 +80,21 @@ export class UsersService {
     return userWithoutPassword;
   }
 
-  async findAll(page: number = 1, limit: number = 10, search: string = '') {
+  async findAll(page: number = 1, limit: number = 10, search: string = '', empresaId?: string | null, isSuperAdmin?: boolean) {
     const skip = (page - 1) * limit;
+    
+    // Construir o where clause
+    const where: any = {};
+    
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (!isSuperAdmin && empresaId) {
+      where.empresaId = empresaId;
+    }
+    // Se for SuperAdmin, não filtrar por empresaId (vê todos)
     
     // Para SQLite, precisamos buscar todos e filtrar manualmente para case-insensitive
     let allUsers = await this.prisma.user.findMany({
+      where,
       select: {
         id: true,
         nome: true,
@@ -77,6 +103,7 @@ export class UsersService {
         cep: true,
         avatar: true,
         resetCode: true,
+        empresaId: true,
         createdAt: true,
         updatedAt: true,
         perfil: true,
@@ -104,7 +131,7 @@ export class UsersService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, empresaId?: string | null, isSuperAdmin?: boolean) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -116,6 +143,7 @@ export class UsersService {
         avatar: true,
         resetCode: true,
         condominioId: true,
+        empresaId: true,
         createdAt: true,
         updatedAt: true,
         perfil: true,
@@ -126,19 +154,42 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    // Validar isolamento por empresaId (se não for SuperAdmin)
+    // Nota: Se isSuperAdmin ou empresaId não fornecido, não validar (usado internamente pelo JwtStrategy)
+    if (isSuperAdmin !== undefined && empresaId !== undefined && !isSuperAdmin && empresaId && user.empresaId !== empresaId) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
+  async update(id: string, updateUserDto: UpdateUserDto, empresaIdFromAuth?: string | null, isSuperAdminAuth?: boolean) {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    // Lógica de empresaId:
+    // - Se for SuperAdmin: pode alterar empresaId (usa do DTO)
+    // - Se não for SuperAdmin: não pode alterar empresaId (mantém o atual ou usa do auth)
+    const updateData: any = { ...updateUserDto };
+    if (isSuperAdminAuth) {
+      // SuperAdmin pode alterar empresaId
+      if (updateUserDto.empresaId !== undefined) {
+        updateData.empresaId = updateUserDto.empresaId;
+      }
+    } else {
+      // Não-SuperAdmin não pode alterar empresaId, mantém o atual ou usa do auth
+      delete updateData.empresaId;
+      if (empresaIdFromAuth !== undefined) {
+        updateData.empresaId = empresaIdFromAuth;
+      }
+    }
+
     const updatedUser = await this.prisma.user.update({
       where: { id },
-      data: updateUserDto,
+      data: updateData,
       include: {
         perfil: true,
       },
@@ -278,7 +329,7 @@ export class UsersService {
     return { message: 'Senha alterada com sucesso' };
   }
 
-  async findAllCondominios() {
+  async findAllCondominios(empresaId?: string | null, isSuperAdmin?: boolean) {
     // Buscar perfil Condomínio
     const allProfiles = await this.prisma.profile.findMany();
     const perfilCondominio = allProfiles.find(
@@ -291,11 +342,20 @@ export class UsersService {
       return [];
     }
 
-    // Buscar todos os usuários com perfil Condomínio
+    // Construir o where clause
+    const where: any = {
+      perfilId: perfilCondominio.id,
+    };
+
+    // Se não for SuperAdmin, filtrar por empresaId
+    if (!isSuperAdmin && empresaId) {
+      where.empresaId = empresaId;
+    }
+    // Se for SuperAdmin, não filtrar por empresaId (vê todos)
+
+    // Buscar usuários com perfil Condomínio
     const condominios = await this.prisma.user.findMany({
-      where: {
-        perfilId: perfilCondominio.id,
-      },
+      where,
       select: {
         id: true,
         nome: true,

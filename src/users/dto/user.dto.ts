@@ -35,6 +35,11 @@ export class CreateUserDto {
   @IsString()
   condominioId?: string;
 
+  @ApiProperty({ description: 'ID da empresa (apenas para SuperAdmin)', required: false })
+  @IsOptional()
+  @IsString()
+  empresaId?: string;
+
   @ApiProperty({ description: 'Avatar do usuário', required: false })
   @IsOptional()
   @IsString()
@@ -66,6 +71,11 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   condominioId?: string;
+
+  @ApiProperty({ description: 'ID da empresa (apenas para SuperAdmin)', required: false })
+  @IsOptional()
+  @IsString()
+  empresaId?: string;
 
   @ApiProperty({ description: 'Avatar do usuário', required: false })
   @IsOptional()
