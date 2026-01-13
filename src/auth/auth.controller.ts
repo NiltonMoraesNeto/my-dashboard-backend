@@ -42,8 +42,9 @@ export class AuthController {
     res.cookie('auth_token', result.access_token, {
       httpOnly: true, // Não pode ser acessado por JavaScript
       secure: process.env.NODE_ENV === 'production', // Só HTTPS em produção
-      sameSite: 'lax', // Proteção CSRF
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' necessário para cross-origin em produção
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+      path: '/', // Disponível em todas as rotas
     });
 
     // Retorna apenas os dados do usuário (sem o token)
@@ -65,7 +66,8 @@ export class AuthController {
     res.clearCookie('auth_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/',
     });
 
     return { message: 'Logout realizado com sucesso' };
