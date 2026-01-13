@@ -6,17 +6,19 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 
-let cachedApp: any;
+let cachedHandler: any;
 
-async function createApp() {
-  if (cachedApp) {
-    return cachedApp;
+async function createHandler() {
+  if (cachedHandler) {
+    return cachedHandler;
   }
 
   const expressApp = express();
+  const adapter = new ExpressAdapter(expressApp);
+  
   const app = await NestFactory.create(
     AppModule,
-    new ExpressAdapter(expressApp),
+    adapter,
   );
 
   // Enable cookie parser
@@ -80,11 +82,12 @@ async function createApp() {
   }
 
   await app.init();
-  cachedApp = expressApp;
+  
+  cachedHandler = expressApp;
   return expressApp;
 }
 
 export default async function handler(req: any, res: any) {
-  const app = await createApp();
-  return app(req, res);
+  const app = await createHandler();
+  app(req, res);
 }
