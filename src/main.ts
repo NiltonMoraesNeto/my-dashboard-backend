@@ -11,8 +11,22 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Enable CORS com suporte a cookies
+  const allowedOrigins = [
+    'http://localhost:5173',
+    process.env.FRONTEND_URL, // URL do frontend em produção
+  ].filter(Boolean); // Remove valores undefined/null
+
   app.enableCors({
-    origin: 'http://localhost:5173', // URL do frontend
+    origin: (origin, callback) => {
+      // Permite requisições sem origin (ex: Postman, mobile apps)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true, // Permite envio de cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
