@@ -14,6 +14,7 @@ async function bootstrap() {
   const allowedOrigins = [
     'http://localhost:5173',
     process.env.FRONTEND_URL, // URL do frontend em produção
+    'https://my-dashboard-seven-sage.vercel.app', // Hardcoded para garantir que funciona
   ].filter(Boolean); // Remove valores undefined/null
 
   app.enableCors({
@@ -21,9 +22,18 @@ async function bootstrap() {
       // Permite requisições sem origin (ex: Postman, mobile apps)
       if (!origin) return callback(null, true);
       
+      // Permite qualquer subdomínio do Vercel
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      
       if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
         callback(null, true);
       } else {
+        // Em produção, loga o origin que foi bloqueado para debug
+        if (process.env.NODE_ENV === 'production') {
+          console.warn(`CORS blocked origin: ${origin}`);
+        }
         callback(new Error('Not allowed by CORS'));
       }
     },
