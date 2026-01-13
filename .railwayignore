@@ -8,3 +8,10 @@ uploads
 coverage
 *.db
 *.db-journal
+.git
+.vscode
+.idea
+*.tsbuildinfo
+test
+prisma/dev.db
+prisma/dev.db-journal
