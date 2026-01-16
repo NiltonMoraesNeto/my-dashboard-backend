@@ -42,6 +42,14 @@ model User {
   password     String
   perfilId     Int
   cep          String?
+  cpf          String?
+  dataNascimento DateTime?
+  logradouro   String?
+  numero       String?
+  complemento  String?
+  bairro       String?
+  cidade       String?
+  uf           String?
   avatar       String?
   resetCode    String?
   condominioId String? // ID do condomínio que criou este morador (null para usuários normais)

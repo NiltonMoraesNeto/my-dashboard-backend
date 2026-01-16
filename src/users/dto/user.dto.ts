@@ -30,6 +30,45 @@ export class CreateUserDto {
   @IsString()
   cep?: string;
 
+  @ApiProperty({ description: 'CPF do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  cpf?: string;
+
+  @ApiProperty({ description: 'Data de nascimento do usuário', required: false })
+  @IsOptional()
+  dataNascimento?: Date;
+
+  @ApiProperty({ description: 'Logradouro do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  logradouro?: string;
+
+  @ApiProperty({ description: 'Número do endereço', required: false })
+  @IsOptional()
+  @IsString()
+  numero?: string;
+
+  @ApiProperty({ description: 'Complemento do endereço', required: false })
+  @IsOptional()
+  @IsString()
+  complemento?: string;
+
+  @ApiProperty({ description: 'Bairro do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  bairro?: string;
+
+  @ApiProperty({ description: 'Cidade do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  cidade?: string;
+
+  @ApiProperty({ description: 'UF do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  uf?: string;
+
   @ApiProperty({ description: 'ID do condomínio (obrigatório quando perfil for Morador)', required: false })
   @IsOptional()
   @IsString()
@@ -66,6 +105,45 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   cep?: string;
+
+  @ApiProperty({ description: 'CPF do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  cpf?: string;
+
+  @ApiProperty({ description: 'Data de nascimento do usuário', required: false })
+  @IsOptional()
+  dataNascimento?: Date;
+
+  @ApiProperty({ description: 'Logradouro do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  logradouro?: string;
+
+  @ApiProperty({ description: 'Número do endereço', required: false })
+  @IsOptional()
+  @IsString()
+  numero?: string;
+
+  @ApiProperty({ description: 'Complemento do endereço', required: false })
+  @IsOptional()
+  @IsString()
+  complemento?: string;
+
+  @ApiProperty({ description: 'Bairro do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  bairro?: string;
+
+  @ApiProperty({ description: 'Cidade do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  cidade?: string;
+
+  @ApiProperty({ description: 'UF do usuário', required: false })
+  @IsOptional()
+  @IsString()
+  uf?: string;
 
   @ApiProperty({ description: 'ID do condomínio (obrigatório quando perfil for Morador)', required: false })
   @IsOptional()
@@ -110,6 +188,30 @@ export class UserResponseDto {
 
   @ApiProperty({ required: false })
   cep?: string;
+
+  @ApiProperty({ required: false })
+  cpf?: string;
+
+  @ApiProperty({ required: false })
+  dataNascimento?: Date;
+
+  @ApiProperty({ required: false })
+  logradouro?: string;
+
+  @ApiProperty({ required: false })
+  numero?: string;
+
+  @ApiProperty({ required: false })
+  complemento?: string;
+
+  @ApiProperty({ required: false })
+  bairro?: string;
+
+  @ApiProperty({ required: false })
+  cidade?: string;
+
+  @ApiProperty({ required: false })
+  uf?: string;
 
   @ApiProperty({ required: false })
   avatar?: string;
