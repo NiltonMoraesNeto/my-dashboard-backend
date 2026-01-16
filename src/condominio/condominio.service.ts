@@ -509,6 +509,8 @@ export class CondominioService {
     page: number = 1,
     limit: number = 10,
     unidadeId?: string,
+    mes?: number,
+    ano?: number,
   ) {
     const skip = (page - 1) * limit;
 
@@ -576,6 +578,30 @@ export class CondominioService {
         }
       }
       boletosWhere.unidadeId = unidadeId;
+    }
+
+    // Aplicar filtros de mês e ano usando o campo vencimento
+    if (mes !== undefined || ano !== undefined) {
+      const dateFilter: any = {};
+      if (ano !== undefined) {
+        if (mes !== undefined) {
+          // Filtro por mês e ano específicos (usando UTC para evitar problemas de timezone)
+          // gte: início do mês (2026-02-01 00:00:00 UTC)
+          // lt: início do próximo mês (2026-03-01 00:00:00 UTC)
+          dateFilter.gte = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+          dateFilter.lt = new Date(Date.UTC(ano, mes, 1, 0, 0, 0, 0));
+        } else {
+          // Filtro apenas por ano (todo o ano)
+          dateFilter.gte = new Date(Date.UTC(ano, 0, 1, 0, 0, 0, 0));
+          dateFilter.lt = new Date(Date.UTC(ano + 1, 0, 1, 0, 0, 0, 0));
+        }
+      } else if (mes !== undefined) {
+        // Filtro apenas por mês (ano atual)
+        const currentYear = new Date().getFullYear();
+        dateFilter.gte = new Date(Date.UTC(currentYear, mes - 1, 1, 0, 0, 0, 0));
+        dateFilter.lt = new Date(Date.UTC(currentYear, mes, 1, 0, 0, 0, 0));
+      }
+      boletosWhere.vencimento = dateFilter;
     }
 
     const [data, total] = await Promise.all([
@@ -1533,6 +1559,8 @@ export class CondominioService {
     limit: number = 10,
     tipo?: string,
     empresaId: string | null = null,
+    mes?: number,
+    ano?: number,
   ) {
     const skip = (page - 1) * limit;
 
@@ -1546,6 +1574,29 @@ export class CondominioService {
     // Se não for SuperAdmin, filtrar por empresaId
     if (empresaId) {
       where.empresaId = empresaId;
+    }
+    // Aplicar filtros de mês e ano usando o campo data
+    if (mes !== undefined || ano !== undefined) {
+      const dateFilter: any = {};
+      if (ano !== undefined) {
+        if (mes !== undefined) {
+          // Filtro por mês e ano específicos (usando UTC para evitar problemas de timezone)
+          // gte: início do mês (2026-02-01 00:00:00 UTC)
+          // lt: início do próximo mês (2026-03-01 00:00:00 UTC)
+          dateFilter.gte = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+          dateFilter.lt = new Date(Date.UTC(ano, mes, 1, 0, 0, 0, 0));
+        } else {
+          // Filtro apenas por ano (todo o ano)
+          dateFilter.gte = new Date(Date.UTC(ano, 0, 1, 0, 0, 0, 0));
+          dateFilter.lt = new Date(Date.UTC(ano + 1, 0, 1, 0, 0, 0, 0));
+        }
+      } else if (mes !== undefined) {
+        // Filtro apenas por mês (ano atual)
+        const currentYear = new Date().getFullYear();
+        dateFilter.gte = new Date(Date.UTC(currentYear, mes - 1, 1, 0, 0, 0, 0));
+        dateFilter.lt = new Date(Date.UTC(currentYear, mes, 1, 0, 0, 0, 0));
+      }
+      where.data = dateFilter;
     }
 
     const [data, total] = await Promise.all([

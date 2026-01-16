@@ -307,22 +307,30 @@ export class CondominioController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
   @ApiQuery({ name: 'unidadeId', required: false, type: String })
+  @ApiQuery({ name: 'mes', required: false, type: Number })
+  @ApiQuery({ name: 'ano', required: false, type: Number })
   findAllBoletos(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('unidadeId') unidadeId?: string,
+    @Query('mes') mes?: string,
+    @Query('ano') ano?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+    const mesNumber = mes ? parseInt(mes, 10) : undefined;
+    const anoNumber = ano ? parseInt(ano, 10) : undefined;
 
     return this.condominioService.findAllBoletos(
       userId,
       pageNumber,
       limit,
       unidadeId,
+      mesNumber,
+      anoNumber,
     );
   }
 
@@ -782,17 +790,23 @@ export class CondominioController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
   @ApiQuery({ name: 'tipo', required: false, type: String })
+  @ApiQuery({ name: 'mes', required: false, type: Number })
+  @ApiQuery({ name: 'ano', required: false, type: Number })
   findAllBalanceteMovimentacoes(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('tipo') tipo?: string,
+    @Query('mes') mes?: string,
+    @Query('ano') ano?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
     const empresaId = user.empresaId || null;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+    const mesNumber = mes ? parseInt(mes, 10) : undefined;
+    const anoNumber = ano ? parseInt(ano, 10) : undefined;
 
     return this.condominioService.findAllBalanceteMovimentacoes(
       userId,
@@ -800,6 +814,8 @@ export class CondominioController {
       limit,
       tipo,
       empresaId,
+      mesNumber,
+      anoNumber,
     );
   }
 
