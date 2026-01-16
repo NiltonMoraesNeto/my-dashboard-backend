@@ -101,21 +101,27 @@ export class CondominioController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllUnidades(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('search') search?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
     const empresaId = user.empresaId || null;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const searchTerm = search || '';
 
     return this.condominioService.findAllUnidades(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       searchTerm,
@@ -205,22 +211,28 @@ export class CondominioController {
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
   @ApiQuery({ name: 'mes', required: false, type: Number })
   @ApiQuery({ name: 'ano', required: false, type: Number })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllContasPagar(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('mes') mes?: string,
     @Query('ano') ano?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const mesNumber = mes ? parseInt(mes, 10) : undefined;
     const anoNumber = ano ? parseInt(ano, 10) : undefined;
 
     return this.condominioService.findAllContasPagar(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       mesNumber,
@@ -309,6 +321,7 @@ export class CondominioController {
   @ApiQuery({ name: 'unidadeId', required: false, type: String })
   @ApiQuery({ name: 'mes', required: false, type: Number })
   @ApiQuery({ name: 'ano', required: false, type: Number })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllBoletos(
     @Req() req: Request,
     @Query('page') page?: string,
@@ -316,16 +329,21 @@ export class CondominioController {
     @Query('unidadeId') unidadeId?: string,
     @Query('mes') mes?: string,
     @Query('ano') ano?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const mesNumber = mes ? parseInt(mes, 10) : undefined;
     const anoNumber = ano ? parseInt(ano, 10) : undefined;
 
     return this.condominioService.findAllBoletos(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       unidadeId,
@@ -447,19 +465,25 @@ export class CondominioController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllReunioes(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
     const empresaId = user.empresaId || null;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
 
     return this.condominioService.findAllReunioes(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       empresaId,
@@ -546,19 +570,25 @@ export class CondominioController {
   })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllAvisos(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
     const empresaId = user.empresaId || null;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
 
     return this.condominioService.findAllAvisos(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       empresaId,
@@ -661,20 +691,26 @@ export class CondominioController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllMoradores(
     @Req() req: Request,
     @Query('page') page?: string,
     @Query('totalItemsByPage') totalItemsByPage?: string,
     @Query('search') search?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const searchTerm = search || '';
 
     return this.condominioService.findAllMoradores(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       searchTerm,
@@ -751,9 +787,24 @@ export class CondominioController {
     status: HttpStatus.OK,
     description: 'Dados agregados mensais retornados com sucesso.',
   })
-  @ApiQuery({ name: 'ano', required: true, type: Number, description: 'Ano para filtrar' })
-  @ApiQuery({ name: 'tipo', required: false, type: String, description: 'Tipo: Entrada ou Saída' })
-  @ApiQuery({ name: 'condominioId', required: false, type: String, description: 'ID do condomínio' })
+  @ApiQuery({
+    name: 'ano',
+    required: true,
+    type: Number,
+    description: 'Ano para filtrar',
+  })
+  @ApiQuery({
+    name: 'tipo',
+    required: false,
+    type: String,
+    description: 'Tipo: Entrada ou Saída',
+  })
+  @ApiQuery({
+    name: 'condominioId',
+    required: false,
+    type: String,
+    description: 'ID do condomínio',
+  })
   getBalanceteMovimentacoesMensal(
     @Req() req: Request,
     @Query('ano') ano: string,
@@ -792,6 +843,7 @@ export class CondominioController {
   @ApiQuery({ name: 'tipo', required: false, type: String })
   @ApiQuery({ name: 'mes', required: false, type: Number })
   @ApiQuery({ name: 'ano', required: false, type: Number })
+  @ApiQuery({ name: 'condominioId', required: false, type: String })
   findAllBalanceteMovimentacoes(
     @Req() req: Request,
     @Query('page') page?: string,
@@ -799,17 +851,22 @@ export class CondominioController {
     @Query('tipo') tipo?: string,
     @Query('mes') mes?: string,
     @Query('ano') ano?: string,
+    @Query('condominioId') condominioId?: string,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
     const empresaId = user.empresaId || null;
+    // Se for SuperAdmin e forneceu condominioId, usar esse condomínio como filtro
+    const effectiveUserId =
+      isSuperAdmin && condominioId ? condominioId : userId;
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
     const mesNumber = mes ? parseInt(mes, 10) : undefined;
     const anoNumber = ano ? parseInt(ano, 10) : undefined;
 
     return this.condominioService.findAllBalanceteMovimentacoes(
-      userId,
+      effectiveUserId,
       pageNumber,
       limit,
       tipo,
