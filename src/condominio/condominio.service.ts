@@ -1626,4 +1626,122 @@ export class CondominioService {
       saldo,
     };
   }
+
+  // ========== BALANCETE MOVIMENTACAO - DADOS AGREGADOS MENSAL ==========
+  async getBalanceteMovimentacoesMensal(
+    userId: string,
+    ano: number,
+    tipo?: 'Entrada' | 'Saída',
+    condominioId?: string,
+    empresaId: string | null = null,
+    isSuperAdmin: boolean = false,
+  ) {
+    // Obter dados do usuário atual
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { condominioId: true, empresaId: true, perfilId: true },
+    });
+
+    // Obter empresaId se não fornecido
+    if (empresaId === null && !isSuperAdmin) {
+      empresaId = user?.empresaId || null;
+    }
+
+    // Buscar perfil Condomínio para identificar se o usuário é do perfil Condomínio
+    const allProfiles = await this.prisma.profile.findMany();
+    const perfilCondominio = allProfiles.find(
+      (p) =>
+        p.descricao.toLowerCase().includes('condomínio') ||
+        p.descricao.toLowerCase().includes('condominio'),
+    );
+    const isPerfilCondominio = user?.perfilId === perfilCondominio?.id;
+
+    // Se for perfil Condomínio, usar o próprio userId como condominioId
+    if (isPerfilCondominio && !condominioId) {
+      condominioId = userId;
+    }
+
+    // Construir where clause
+    const where: any = {
+      data: {
+        gte: new Date(`${ano}-01-01`),
+        lt: new Date(`${ano + 1}-01-01`),
+      },
+    };
+
+    // Filtrar por tipo
+    if (tipo) {
+      where.tipo = tipo;
+    }
+
+    // Filtrar por condomínio (via userId que tem condominioId)
+    if (condominioId) {
+      // Buscar o condomínio para validar empresaId se não for SuperAdmin
+      const condominioSelecionado = await this.prisma.user.findUnique({
+        where: { id: condominioId },
+        select: { empresaId: true, condominioId: true },
+      });
+
+      // Validar que o condomínio pertence à empresa do usuário (se não for SuperAdmin)
+      if (!isSuperAdmin && empresaId && condominioSelecionado?.empresaId !== empresaId) {
+        throw new ForbiddenException(
+          'Condomínio não pertence à sua empresa',
+        );
+      }
+
+      // Buscar todos os userIds que pertencem a este condomínio
+      // Incluir:
+      // 1. O próprio condomínio (userId = condominioId)
+      // 2. Todos os moradores desse condomínio (usuários que têm condominioId = condominioId)
+      let userIds: string[] = [condominioId]; // Sempre incluir o próprio condomínio
+      
+      // Buscar usuários que pertencem a este condomínio (moradores)
+      const moradoresDoCondominio = await this.prisma.user.findMany({
+        where: { condominioId },
+        select: { id: true },
+      });
+      
+      // Adicionar IDs dos moradores
+      moradoresDoCondominio.forEach((morador) => {
+        if (!userIds.includes(morador.id)) {
+          userIds.push(morador.id);
+        }
+      });
+      
+      where.userId = { in: userIds };
+    }
+
+    // Se não for SuperAdmin e tem empresaId, filtrar por empresaId
+    if (!isSuperAdmin && empresaId) {
+      where.empresaId = empresaId;
+    }
+
+    // Buscar todas as movimentações do ano
+    const movimentacoes = await this.prisma.balanceteMovimentacao.findMany({
+      where,
+      select: {
+        data: true,
+        valor: true,
+        tipo: true,
+      },
+    });
+
+    // Agregar por mês
+    const meses = Array.from({ length: 12 }, (_, i) => i + 1);
+    const dadosMensais = meses.map((mes) => {
+      const movimentacoesDoMes = movimentacoes.filter((m) => {
+        const dataMov = new Date(m.data);
+        return dataMov.getMonth() + 1 === mes;
+      });
+
+      const total = movimentacoesDoMes.reduce((sum, m) => sum + Number(m.valor), 0);
+
+      return {
+        mes,
+        valor: total,
+      };
+    });
+
+    return dadosMensais;
+  }
 }

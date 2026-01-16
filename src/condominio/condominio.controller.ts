@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -722,6 +723,41 @@ export class CondominioController {
       userId,
       createBalanceteMovimentacaoDto,
       empresaId,
+    );
+  }
+
+  @Get('balancete/movimentacoes/mensal')
+  @ApiOperation({ summary: 'Obter dados agregados mensais de movimentações' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Dados agregados mensais retornados com sucesso.',
+  })
+  @ApiQuery({ name: 'ano', required: true, type: Number, description: 'Ano para filtrar' })
+  @ApiQuery({ name: 'tipo', required: false, type: String, description: 'Tipo: Entrada ou Saída' })
+  @ApiQuery({ name: 'condominioId', required: false, type: String, description: 'ID do condomínio' })
+  getBalanceteMovimentacoesMensal(
+    @Req() req: Request,
+    @Query('ano') ano: string,
+    @Query('tipo') tipo?: 'Entrada' | 'Saída',
+    @Query('condominioId') condominioId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    const anoNumber = parseInt(ano, 10);
+
+    if (isNaN(anoNumber)) {
+      throw new BadRequestException('Ano inválido');
+    }
+
+    return this.condominioService.getBalanceteMovimentacoesMensal(
+      userId,
+      anoNumber,
+      tipo,
+      condominioId,
+      empresaId,
+      isSuperAdmin,
     );
   }
 
