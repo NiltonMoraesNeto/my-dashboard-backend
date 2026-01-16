@@ -171,6 +171,7 @@ export class CondominioController {
 
   // ========== CONTAS A PAGAR ==========
   @Post('contas-pagar')
+  @UseInterceptors(FileInterceptor('anexo'))
   @ApiOperation({ summary: 'Criar uma nova conta a pagar' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -180,10 +181,17 @@ export class CondominioController {
   createContaPagar(
     @Req() req: Request,
     @Body() createContaPagarDto: CreateContaPagarDto,
+    @UploadedFile() anexo?: Express.Multer.File,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
-    return this.condominioService.createContaPagar(userId, createContaPagarDto);
+    const empresaId = user.empresaId || null;
+    return this.condominioService.createContaPagar(
+      userId,
+      createContaPagarDto,
+      empresaId,
+      anexo,
+    );
   }
 
   @Get('contas-pagar')
@@ -234,6 +242,7 @@ export class CondominioController {
   }
 
   @Patch('contas-pagar/:id')
+  @UseInterceptors(FileInterceptor('anexo'))
   @ApiOperation({ summary: 'Atualizar conta a pagar' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -244,6 +253,7 @@ export class CondominioController {
     @Req() req: Request,
     @Param('id') id: string,
     @Body() updateContaPagarDto: UpdateContaPagarDto,
+    @UploadedFile() anexo?: Express.Multer.File,
   ) {
     const user = req.user as AuthUser;
     const userId = user.userId;
@@ -251,6 +261,7 @@ export class CondominioController {
       userId,
       id,
       updateContaPagarDto,
+      anexo,
     );
   }
 

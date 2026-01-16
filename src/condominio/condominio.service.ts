@@ -213,6 +213,7 @@ export class CondominioService {
     userId: string,
     createContaPagarDto: CreateContaPagarDto,
     empresaId: string | null = null,
+    anexoFile?: Express.Multer.File,
   ) {
     // Obter empresaId se não fornecido
     if (empresaId === null) {
@@ -231,14 +232,36 @@ export class CondominioService {
       }
     }
 
-    return this.prisma.contaPagar.create({
+    // Salvar anexo se fornecido
+    let anexoPath: string | undefined;
+    if (anexoFile) {
+      anexoPath = await this.saveContaPagarFile(anexoFile);
+    }
+
+    // Criar conta a pagar
+    const contaPagar = await this.prisma.contaPagar.create({
       data: {
         ...createContaPagarDto,
         vencimento: new Date(createContaPagarDto.vencimento),
         userId,
         empresaId: empresaId!,
+        anexo: anexoPath,
       },
     });
+
+    // Criar movimentação no balancete como "Saída"
+    await this.prisma.balanceteMovimentacao.create({
+      data: {
+        tipo: 'Saída',
+        data: new Date(createContaPagarDto.vencimento),
+        valor: createContaPagarDto.valor,
+        motivo: `Conta a pagar: ${createContaPagarDto.descricao}`,
+        userId,
+        empresaId: empresaId!,
+      },
+    });
+
+    return contaPagar;
   }
 
   async findAllContasPagar(
@@ -327,8 +350,9 @@ export class CondominioService {
     userId: string,
     id: string,
     updateContaPagarDto: UpdateContaPagarDto,
+    anexoFile?: Express.Multer.File,
   ) {
-    await this.findOneContaPagar(userId, id); // Valida existência e permissão
+    const contaPagar = await this.findOneContaPagar(userId, id); // Valida existência e permissão
 
     // Se atualizar unidadeId, verificar se pertence ao usuário
     if (updateContaPagarDto.unidadeId) {
@@ -342,6 +366,17 @@ export class CondominioService {
       }
     }
 
+    // Se houver novo anexo, deletar o antigo e salvar o novo
+    let anexoPath: string | undefined = contaPagar.anexo || undefined;
+    if (anexoFile) {
+      // Deletar arquivo antigo se existir
+      if (contaPagar.anexo) {
+        await this.deleteContaPagarFile(contaPagar.anexo);
+      }
+      // Salvar novo arquivo
+      anexoPath = await this.saveContaPagarFile(anexoFile);
+    }
+
     const data: {
       descricao?: string;
       valor?: number;
@@ -352,6 +387,7 @@ export class CondominioService {
       status?: string;
       unidadeId?: string;
       observacoes?: string;
+      anexo?: string;
     } = {};
 
     if (updateContaPagarDto.descricao !== undefined) {
@@ -381,6 +417,9 @@ export class CondominioService {
     if (updateContaPagarDto.observacoes !== undefined) {
       data.observacoes = updateContaPagarDto.observacoes;
     }
+    if (anexoPath !== undefined) {
+      data.anexo = anexoPath;
+    }
 
     return this.prisma.contaPagar.update({
       where: { id },
@@ -389,7 +428,12 @@ export class CondominioService {
   }
 
   async removeContaPagar(userId: string, id: string) {
-    await this.findOneContaPagar(userId, id); // Valida existência e permissão
+    const contaPagar = await this.findOneContaPagar(userId, id); // Valida existência e permissão
+
+    // Deletar arquivo anexo se existir
+    if (contaPagar.anexo) {
+      await this.deleteContaPagarFile(contaPagar.anexo);
+    }
 
     return this.prisma.contaPagar.delete({
       where: { id },
@@ -718,6 +762,34 @@ export class CondominioService {
   }
 
   private async deleteBoletoFile(filePath: string): Promise<void> {
+    const fullPath = path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
+  // Métodos auxiliares para gerenciamento de arquivos de Conta a Pagar
+  private async saveContaPagarFile(file: Express.Multer.File): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'contas-pagar');
+    
+    // Criar diretório se não existir
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Gerar nome único para o arquivo
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}${fileExtension}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Salvar arquivo
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Retornar caminho relativo para armazenar no banco
+    return `uploads/contas-pagar/${fileName}`;
+  }
+
+  private async deleteContaPagarFile(filePath: string): Promise<void> {
     const fullPath = path.join(process.cwd(), filePath);
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);

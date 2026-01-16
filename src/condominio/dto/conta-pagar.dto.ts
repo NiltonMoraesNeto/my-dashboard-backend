@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsDateString, IsInt, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateContaPagarDto {
   @ApiProperty({ description: 'Descrição da conta' })
@@ -7,8 +8,15 @@ export class CreateContaPagarDto {
   descricao: string;
 
   @ApiProperty({ description: 'Valor da conta' })
-  @IsNumber()
-  @Min(0)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsNumber({}, { message: 'valor must be a number conforming to the specified constraints' })
+  @Min(0, { message: 'valor must not be less than 0' })
   valor: number;
 
   @ApiProperty({ description: 'Data de vencimento' })
@@ -16,13 +24,27 @@ export class CreateContaPagarDto {
   vencimento: string;
 
   @ApiProperty({ description: 'Mês da conta (1-12)' })
-  @IsInt()
-  @Min(1)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsInt({ message: 'mes must be an integer number' })
+  @Min(1, { message: 'mes must not be less than 1' })
   mes: number;
 
   @ApiProperty({ description: 'Ano da conta' })
-  @IsInt()
-  @Min(2000)
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsInt({ message: 'ano must be an integer number' })
+  @Min(2000, { message: 'ano must not be less than 2000' })
   ano: number;
 
   @ApiProperty({ description: 'Categoria da conta', required: false })
@@ -44,6 +66,11 @@ export class CreateContaPagarDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @ApiProperty({ description: 'Caminho do arquivo anexo', required: false })
+  @IsOptional()
+  @IsString()
+  anexo?: string;
 }
 
 export class UpdateContaPagarDto {
@@ -54,8 +81,15 @@ export class UpdateContaPagarDto {
 
   @ApiProperty({ description: 'Valor da conta', required: false })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
+  @Transform(({ value }) => {
+    if (value !== undefined && typeof value === 'string') {
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsNumber({}, { message: 'valor must be a number conforming to the specified constraints' })
+  @Min(0, { message: 'valor must not be less than 0' })
   valor?: number;
 
   @ApiProperty({ description: 'Data de vencimento', required: false })
@@ -65,14 +99,28 @@ export class UpdateContaPagarDto {
 
   @ApiProperty({ description: 'Mês da conta (1-12)', required: false })
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @Transform(({ value }) => {
+    if (value !== undefined && typeof value === 'string') {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsInt({ message: 'mes must be an integer number' })
+  @Min(1, { message: 'mes must not be less than 1' })
   mes?: number;
 
   @ApiProperty({ description: 'Ano da conta', required: false })
   @IsOptional()
-  @IsInt()
-  @Min(2000)
+  @Transform(({ value }) => {
+    if (value !== undefined && typeof value === 'string') {
+      const num = parseInt(value, 10);
+      return isNaN(num) ? value : num;
+    }
+    return value;
+  })
+  @IsInt({ message: 'ano must be an integer number' })
+  @Min(2000, { message: 'ano must not be less than 2000' })
   ano?: number;
 
   @ApiProperty({ description: 'Categoria da conta', required: false })
@@ -94,6 +142,11 @@ export class UpdateContaPagarDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @ApiProperty({ description: 'Caminho do arquivo anexo', required: false })
+  @IsOptional()
+  @IsString()
+  anexo?: string;
 }
 
 export class ContaPagarResponseDto {
@@ -126,6 +179,9 @@ export class ContaPagarResponseDto {
 
   @ApiProperty({ required: false })
   observacoes?: string;
+
+  @ApiProperty({ required: false })
+  anexo?: string;
 
   @ApiProperty()
   createdAt: Date;
