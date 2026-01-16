@@ -11,17 +11,41 @@ datasource db {
 }
 
 model Empresa {
-  id          String    @id @default(cuid())
-  nome        String
-  cnpj        String?   @unique
-  email       String?
-  telefone    String?
-  ativa       Boolean   @default(true)
-  dataInicio  DateTime  @default(now())
-  dataFim     DateTime?
-  observacoes String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  nome                 String
+  cnpj                 String?   @unique
+  razaoSocial          String?
+  nomeFantasia         String?
+  situacaoCadastral     String?
+  dataSituacaoCadastral DateTime?
+  matrizFilial         String?
+  dataInicioAtividade  DateTime?
+  cnaePrincipal        String?
+  cnaesSecundarios     String?   // JSON array como string
+  naturezaJuridica     String?
+  logradouro           String?
+  numero               String?
+  complemento          String?
+  bairro               String?
+  cep                  String?
+  uf                   String?
+  municipio            String?
+  email                String?
+  telefone             String?
+  telefones            String?   // JSON array como string
+  capitalSocial        String?
+  porteEmpresa         String?
+  opcaoSimples         String?
+  dataOpcaoSimples     DateTime?
+  opcaoMei             String?
+  dataOpcaoMei         DateTime?
+  qsa                  String?   // JSON array como string
+  ativa                Boolean   @default(true)
+  dataInicio           DateTime  @default(now())
+  dataFim              DateTime?
+  observacoes          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   usuarios               User[]
   unidades               Unidade[]
