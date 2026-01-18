@@ -18,6 +18,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import type { Request } from 'express';
 import type { AuthUser } from '../auth/types/auth-user.interface';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   ApiTags,
   ApiOperation,
@@ -41,6 +43,11 @@ import {
   UpdateBoletoDto,
   BoletoResponseDto,
 } from './dto/boleto.dto';
+import {
+  CreateEntregaDto,
+  UpdateEntregaDto,
+  EntregaResponseDto,
+} from './dto/entrega.dto';
 import {
   CreateReuniaoDto,
   UpdateReuniaoDto,
@@ -432,6 +439,165 @@ export class CondominioController {
     const user = req.user as AuthUser;
     const userId = user.userId;
     return this.condominioService.removeBoleto(userId, id);
+  }
+
+  // ========== ENTREGAS ==========
+  @Post('entregas')
+  @UseInterceptors(FileInterceptor('anexo'))
+  @ApiOperation({ summary: 'Criar uma nova entrega' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Entrega criada com sucesso.',
+    type: EntregaResponseDto,
+  })
+  createEntrega(
+    @Req() req: Request,
+    @Body() createEntregaDto: CreateEntregaDto,
+    @UploadedFile() arquivo?: Express.Multer.File,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const empresaId = user.empresaId || null;
+    createEntregaDto.anexo = arquivo;
+    return this.condominioService.createEntrega(
+      userId,
+      createEntregaDto,
+      empresaId,
+    );
+  }
+
+  @Get('entregas')
+  @ApiOperation({ summary: 'Listar todas as entregas' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Número da página' })
+  @ApiQuery({ name: 'totalItemsByPage', required: false, type: Number, description: 'Itens por página' })
+  @ApiQuery({ name: 'unidadeId', required: false, type: String, description: 'ID da unidade' })
+  @ApiQuery({ name: 'condominioId', required: false, type: String, description: 'ID do condomínio' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de entregas retornada com sucesso.',
+  })
+  findAllEntregas(
+    @Req() req: Request,
+    @Query('page') page?: string,
+    @Query('totalItemsByPage') totalItemsByPage?: string,
+    @Query('unidadeId') unidadeId?: string,
+    @Query('condominioId') condominioId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const isSuperAdmin = user.isSuperAdmin || false;
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limit = totalItemsByPage ? parseInt(totalItemsByPage, 10) : 10;
+    const effectiveCondominioId = isSuperAdmin && condominioId ? condominioId : undefined;
+    return this.condominioService.findAllEntregas(
+      userId,
+      pageNumber,
+      limit,
+      unidadeId,
+      effectiveCondominioId,
+    );
+  }
+
+  @Get('entregas/:id')
+  @ApiOperation({ summary: 'Obter uma entrega por ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Entrega retornada com sucesso.',
+    type: EntregaResponseDto,
+  })
+  findOneEntrega(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    return this.condominioService.findOneEntrega(userId, id);
+  }
+
+  @Get('entregas/:id/download')
+  @ApiOperation({ summary: 'Download do anexo da entrega' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Arquivo anexo retornado com sucesso.',
+  })
+  async downloadEntregaAnexo(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const entrega = await this.condominioService.findOneEntrega(userId, id);
+
+    if (!entrega.anexo) {
+      return res.status(HttpStatus.NOT_FOUND).json({
+        message: 'Arquivo anexo não encontrado',
+      });
+    }
+
+    const filePath = path.join(process.cwd(), entrega.anexo);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(HttpStatus.NOT_FOUND).json({
+        message: 'Arquivo anexo não encontrado',
+      });
+    }
+
+    // Extrair a extensão do caminho do arquivo (ex: uploads/entregas/1234567890-abc.jpg)
+    const ext = path.extname(entrega.anexo).toLowerCase();
+    
+    // Determinar o Content-Type baseado na extensão do arquivo
+    let contentType = 'application/octet-stream';
+    if (ext === '.jpg' || ext === '.jpeg') {
+      contentType = 'image/jpeg';
+    } else if (ext === '.png') {
+      contentType = 'image/png';
+    } else if (ext === '.gif') {
+      contentType = 'image/gif';
+    } else if (ext === '.pdf') {
+      contentType = 'application/pdf';
+    } else if (ext === '.webp') {
+      contentType = 'image/webp';
+    }
+
+    // Usar o nome do arquivo original com a extensão correta
+    const fileName = `anexo-entrega-${id}${ext}`;
+
+    return res.sendFile(filePath, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+      },
+    });
+  }
+
+  @Patch('entregas/:id')
+  @UseInterceptors(FileInterceptor('anexo'))
+  @ApiOperation({ summary: 'Atualizar uma entrega' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Entrega atualizada com sucesso.',
+    type: EntregaResponseDto,
+  })
+  updateEntrega(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() updateEntregaDto: UpdateEntregaDto,
+    @UploadedFile() arquivo?: Express.Multer.File,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    updateEntregaDto.anexo = arquivo;
+    return this.condominioService.updateEntrega(userId, id, updateEntregaDto);
+  }
+
+  @Delete('entregas/:id')
+  @ApiOperation({ summary: 'Excluir entrega' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Entrega excluída com sucesso.',
+  })
+  removeEntrega(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    return this.condominioService.removeEntrega(userId, id);
   }
 
   // ========== REUNIÕES ==========

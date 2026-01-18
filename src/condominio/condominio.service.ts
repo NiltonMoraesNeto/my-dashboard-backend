@@ -19,6 +19,7 @@ import {
   UpdateBalanceteMovimentacaoDto,
 } from './dto/balancete-movimentacao.dto';
 import { CreateBoletoDto, UpdateBoletoDto } from './dto/boleto.dto';
+import { CreateEntregaDto, UpdateEntregaDto } from './dto/entrega.dto';
 import { CreateReuniaoDto, UpdateReuniaoDto } from './dto/reuniao.dto';
 import { CreateAvisoDto, UpdateAvisoDto } from './dto/aviso.dto';
 import { CreateMoradorDto, UpdateMoradorDto } from './dto/morador.dto';
@@ -838,6 +839,359 @@ export class CondominioService {
     return fullPath;
   }
 
+  // ========== ENTREGAS ==========
+  async createEntrega(userId: string, createEntregaDto: CreateEntregaDto, empresaId: string | null = null) {
+    // Obter empresaId se não fornecido
+    if (empresaId === null) {
+      empresaId = await this.getEmpresaId(userId);
+    }
+
+    // Verificar se a unidade pertence ao usuário e buscar com morador
+    const unidade = await this.prisma.unidade.findUnique({
+      where: { id: createEntregaDto.unidadeId },
+      include: {
+        morador: true,
+      },
+    });
+    if (!unidade || unidade.userId !== userId) {
+      throw new ForbiddenException(
+        'Unidade não encontrada ou não pertence ao seu condomínio',
+      );
+    }
+
+    // Processar upload do arquivo anexo se fornecido
+    let anexoPath: string | undefined;
+    if (createEntregaDto.anexo) {
+      anexoPath = await this.saveEntregaFile(createEntregaDto.anexo);
+    }
+
+    // Criar a entrega
+    const entrega = await this.prisma.entrega.create({
+      data: {
+        titulo: createEntregaDto.titulo || 'Nova entrega',
+        dataHora: new Date(createEntregaDto.dataHora),
+        nomeRecebedor: createEntregaDto.nomeRecebedor,
+        recebidoPor: createEntregaDto.recebidoPor,
+        unidadeId: createEntregaDto.unidadeId,
+        anexo: anexoPath,
+        userId,
+        empresaId: empresaId!,
+      },
+      include: {
+        unidade: true,
+      },
+    });
+
+    // Criar aviso para o morador se a unidade tiver morador vinculado
+    // IMPORTANTE: O aviso deve ser criado com userId do condomínio (não do morador)
+    // porque a listagem de avisos para moradores busca avisos onde userId = condominioId
+    if (unidade.moradorId) {
+      // Buscar o morador para verificar se ele pertence ao condomínio correto
+      const morador = await this.prisma.user.findUnique({
+        where: { id: unidade.moradorId },
+        select: { empresaId: true, condominioId: true },
+      });
+
+      // Verificar se o morador existe e pertence ao condomínio que está criando a entrega
+      // O morador deve ter condominioId igual ao userId do condomínio
+      const moradorPertenceAoCondominio = morador && morador.condominioId === userId;
+
+      // Só criar aviso se o morador existir e pertencer ao condomínio
+      // Não precisamos verificar empresaId aqui, pois o filtro na listagem já trata isso
+      if (morador && moradorPertenceAoCondominio) {
+        const recebidoPorLabel = 
+          createEntregaDto.recebidoPor === 'portaria' ? 'Portaria' :
+          createEntregaDto.recebidoPor === 'zelador' ? 'Zelador' :
+          'Morador';
+        
+        const descricao = `Uma nova entrega foi registrada para sua unidade ${unidade.numero}${unidade.bloco ? ` - Bloco ${unidade.bloco}` : ''}${unidade.apartamento ? ` - Apt ${unidade.apartamento}` : ''}. Recebido por: ${createEntregaDto.nomeRecebedor} (${recebidoPorLabel}).`;
+
+        // Criar o aviso com userId do condomínio e destinatarioId do morador
+        // Se destinatarioId for null, o aviso é geral (todos veem)
+        // Se destinatarioId tiver valor, apenas aquele morador vê
+        const avisoData: {
+          titulo: string;
+          descricao: string;
+          tipo: string;
+          dataInicio: Date;
+          userId: string;
+          destinatarioId: string;
+          empresaId: string | null;
+          destaque: boolean;
+        } = {
+          titulo: 'Nova entrega',
+          descricao,
+          tipo: 'Informativo',
+          dataInicio: new Date(),
+          userId: userId, // userId do condomínio (não do morador)
+          destinatarioId: unidade.moradorId, // ID do morador que deve receber o aviso
+          empresaId: empresaId, // empresaId do condomínio (pode ser null)
+          destaque: true,
+        };
+
+        await this.prisma.aviso.create({
+          data: avisoData,
+        });
+      }
+    }
+
+    return entrega;
+  }
+
+  async findAllEntregas(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    unidadeId?: string,
+    condominioId?: string,
+  ) {
+    const skip = (page - 1) * limit;
+
+    // Buscar o usuário para verificar o perfil
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { perfil: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const allProfiles = await this.prisma.profile.findMany();
+    const perfilCondominio = allProfiles.find(
+      (p) =>
+        p.descricao.toLowerCase().includes('condomínio') ||
+        p.descricao.toLowerCase().includes('condominio'),
+    );
+    const perfilSuperAdmin = allProfiles.find((p) =>
+      p.descricao.toLowerCase().includes('superadmin'),
+    );
+
+    // Determinar quais entregas mostrar
+    let entregasWhere: Prisma.EntregaWhereInput = {};
+
+    const isSuperAdmin = perfilSuperAdmin && user.perfilId === perfilSuperAdmin.id;
+    const effectiveUserId = isSuperAdmin && condominioId ? condominioId : userId;
+
+    if (perfilCondominio && user.perfilId === perfilCondominio.id) {
+      // Se é condomínio, mostra apenas as entregas criadas por ele
+      entregasWhere = { userId: effectiveUserId };
+    } else {
+      // Fallback: apenas entregas criadas por ele
+      entregasWhere = { userId: effectiveUserId };
+    }
+
+    // Filtrar por unidade se fornecido
+    if (unidadeId) {
+      entregasWhere.unidadeId = unidadeId;
+    }
+
+    // Filtrar por empresaId se não for SuperAdmin
+    if (!isSuperAdmin) {
+      const empresaId = await this.getEmpresaId(effectiveUserId);
+      if (empresaId) {
+        entregasWhere.empresaId = empresaId;
+      }
+    } else if (condominioId) {
+      const empresaId = await this.getEmpresaId(condominioId);
+      if (empresaId) {
+        entregasWhere.empresaId = empresaId;
+      }
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.entrega.findMany({
+        where: entregasWhere,
+        include: {
+          unidade: true,
+        },
+        orderBy: { dataHora: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.entrega.count({ where: entregasWhere }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findOneEntrega(userId: string, id: string) {
+    const entrega = await this.prisma.entrega.findUnique({
+      where: { id },
+      include: {
+        unidade: true,
+      },
+    });
+
+    if (!entrega) {
+      throw new NotFoundException(`Entrega com ID ${id} não encontrada`);
+    }
+
+    // Buscar o usuário para verificar o perfil
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { perfil: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const allProfiles = await this.prisma.profile.findMany();
+    const perfilCondominio = allProfiles.find(
+      (p) =>
+        p.descricao.toLowerCase().includes('condomínio') ||
+        p.descricao.toLowerCase().includes('condominio'),
+    );
+
+    // Verificar permissão
+    let temAcesso = false;
+    if (perfilCondominio && user.perfilId === perfilCondominio.id) {
+      // Condomínio: só pode ver entregas criadas por ele
+      temAcesso = entrega.userId === userId;
+    } else {
+      // Fallback: apenas entregas criadas por ele
+      temAcesso = entrega.userId === userId;
+    }
+
+    if (!temAcesso) {
+      throw new ForbiddenException(
+        'Você não tem permissão para acessar esta entrega',
+      );
+    }
+
+    return entrega;
+  }
+
+  async updateEntrega(
+    userId: string,
+    id: string,
+    updateEntregaDto: UpdateEntregaDto,
+  ) {
+    const entrega = await this.findOneEntrega(userId, id); // Valida existência e permissão
+
+    // Se atualizar unidadeId, verificar se pertence ao usuário
+    if (updateEntregaDto.unidadeId) {
+      const unidade = await this.prisma.unidade.findUnique({
+        where: { id: updateEntregaDto.unidadeId },
+      });
+      if (!unidade || unidade.userId !== userId) {
+        throw new ForbiddenException(
+          'Unidade não encontrada ou não pertence ao seu condomínio',
+        );
+      }
+    }
+
+    // Processar upload do arquivo anexo se fornecido
+    let anexoPath: string | undefined;
+    if (updateEntregaDto.anexo) {
+      // Deletar arquivo antigo se existir
+      if (entrega.anexo) {
+        await this.deleteEntregaFile(entrega.anexo);
+      }
+      // Salvar novo arquivo
+      anexoPath = await this.saveEntregaFile(updateEntregaDto.anexo);
+    }
+
+    const data: {
+      titulo?: string;
+      dataHora?: Date;
+      nomeRecebedor?: string;
+      recebidoPor?: string;
+      unidadeId?: string;
+      anexo?: string;
+    } = {};
+
+    if (updateEntregaDto.titulo !== undefined) {
+      data.titulo = updateEntregaDto.titulo;
+    }
+    if (updateEntregaDto.dataHora) {
+      data.dataHora = new Date(updateEntregaDto.dataHora);
+    }
+    if (updateEntregaDto.nomeRecebedor !== undefined) {
+      data.nomeRecebedor = updateEntregaDto.nomeRecebedor;
+    }
+    if (updateEntregaDto.recebidoPor !== undefined) {
+      data.recebidoPor = updateEntregaDto.recebidoPor;
+    }
+    if (updateEntregaDto.unidadeId !== undefined) {
+      data.unidadeId = updateEntregaDto.unidadeId;
+    }
+    if (anexoPath !== undefined) {
+      data.anexo = anexoPath;
+    }
+
+    return this.prisma.entrega.update({
+      where: { id },
+      data,
+      include: {
+        unidade: true,
+      },
+    });
+  }
+
+  async removeEntrega(userId: string, id: string) {
+    const entrega = await this.findOneEntrega(userId, id); // Valida existência e permissão
+
+    // Deletar arquivo anexo se existir
+    if (entrega.anexo) {
+      await this.deleteEntregaFile(entrega.anexo);
+    }
+
+    return this.prisma.entrega.delete({
+      where: { id },
+    });
+  }
+
+  // Métodos auxiliares para gerenciamento de arquivos de Entrega
+  private async saveEntregaFile(file: Express.Multer.File): Promise<string> {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'entregas');
+    
+    // Criar diretório se não existir
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Gerar nome único para o arquivo
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}${fileExtension}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Salvar arquivo
+    fs.writeFileSync(filePath, file.buffer);
+
+    // Retornar caminho relativo para armazenar no banco
+    return `uploads/entregas/${fileName}`;
+  }
+
+  private async deleteEntregaFile(filePath: string): Promise<void> {
+    const fullPath = path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
+  async getEntregaAnexoPath(userId: string, id: string): Promise<string | null> {
+    const entrega = await this.findOneEntrega(userId, id);
+    
+    if (!entrega.anexo) {
+      return null;
+    }
+
+    const fullPath = path.join(process.cwd(), entrega.anexo);
+    
+    if (!fs.existsSync(fullPath)) {
+      return null;
+    }
+
+    return fullPath;
+  }
+
   // ========== REUNIÕES ==========
   async createReuniao(userId: string, createReuniaoDto: CreateReuniaoDto, empresaId: string | null = null) {
     // Obter empresaId se não fornecido
@@ -986,6 +1340,7 @@ export class CondominioService {
       dataFim?: Date;
       destaque?: boolean;
       userId: string;
+      destinatarioId?: string | null;
       empresaId: string;
     } = {
       titulo: createAvisoDto.titulo,
@@ -1003,6 +1358,9 @@ export class CondominioService {
     }
     if (createAvisoDto.destaque !== undefined) {
       data.destaque = createAvisoDto.destaque;
+    }
+    if (createAvisoDto.destinatarioId !== undefined) {
+      data.destinatarioId = createAvisoDto.destinatarioId || null;
     }
 
     return this.prisma.aviso.create({
@@ -1043,21 +1401,32 @@ export class CondominioService {
     if (perfilCondominio && user.perfilId === perfilCondominio.id) {
       // Se é condomínio, mostra apenas os avisos criados por ele
       avisosWhere = { userId };
+      // Adicionar filtro por empresaId (se não for SuperAdmin)
+      if (empresaId) {
+        avisosWhere.empresaId = empresaId;
+      }
     } else if (
       perfilMorador &&
       user.perfilId === perfilMorador.id &&
       user.condominioId
     ) {
-      // Se é morador, mostra avisos do condomínio dele
-      avisosWhere = { userId: user.condominioId };
+      // Se é morador, mostra:
+      // 1. Avisos gerais do condomínio (destinatarioId = null)
+      // 2. Avisos específicos para ele (destinatarioId = userId do morador)
+      avisosWhere = {
+        userId: user.condominioId,
+        OR: [
+          { destinatarioId: null }, // Avisos gerais (todos veem)
+          { destinatarioId: userId }, // Avisos específicos para este morador
+        ],
+      };
     } else {
       // Fallback: mostra apenas os avisos criados por ele
       avisosWhere = { userId };
-    }
-
-    // Adicionar filtro por empresaId (se não for SuperAdmin)
-    if (empresaId) {
-      avisosWhere.empresaId = empresaId;
+      // Adicionar filtro por empresaId (se não for SuperAdmin)
+      if (empresaId) {
+        avisosWhere.empresaId = empresaId;
+      }
     }
 
     const [avisos, total] = await Promise.all([

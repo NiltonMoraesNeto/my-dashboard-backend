@@ -28,6 +28,11 @@ export class CreateAvisoDto {
   @IsOptional()
   @IsBoolean()
   destaque?: boolean;
+
+  @ApiProperty({ description: 'ID do morador destinatário (null = aviso geral para todos)', required: false })
+  @IsOptional()
+  @IsString()
+  destinatarioId?: string;
 }
 
 export class UpdateAvisoDto {
@@ -60,6 +65,11 @@ export class UpdateAvisoDto {
   @IsOptional()
   @IsBoolean()
   destaque?: boolean;
+
+  @ApiProperty({ description: 'ID do morador destinatário (null = aviso geral para todos)', required: false })
+  @IsOptional()
+  @IsString()
+  destinatarioId?: string;
 }
 
 export class AvisoResponseDto {
@@ -86,6 +96,9 @@ export class AvisoResponseDto {
 
   @ApiProperty({ required: false })
   lido?: boolean;
+
+  @ApiProperty({ required: false })
+  destinatarioId?: string;
 
   @ApiProperty()
   createdAt: Date;

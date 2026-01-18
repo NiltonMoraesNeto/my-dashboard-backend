@@ -51,6 +51,7 @@ model Empresa {
   unidades               Unidade[]
   contasPagar            ContaPagar[]
   boletos                Boleto[]
+  entregas               Entrega[]
   reunioes               Reuniao[]
   avisos                 Aviso[]
   balanceteMovimentacoes BalanceteMovimentacao[]
@@ -90,8 +91,10 @@ model User {
   unidadesComoMorador    Unidade[]               @relation("UnidadeMorador")
   contasPagar            ContaPagar[]
   boletos                Boleto[]
+  entregas               Entrega[]
   reunioes               Reuniao[]
-  avisos                 Aviso[]
+  avisos                 Aviso[]              @relation("AvisoCriador")
+  avisosRecebidos        Aviso[]              @relation("AvisoDestinatario")
   avisosLidos            AvisoLeitura[]
   balanceteMovimentacoes BalanceteMovimentacao[]
 
@@ -146,6 +149,7 @@ model Unidade {
   empresa     Empresa?     @relation(fields: [empresaId], references: [id])
   boletos     Boleto[]
   contasPagar ContaPagar[]
+  entregas    Entrega[]
 
   @@index([empresaId])
   @@map("unidades")
@@ -199,6 +203,28 @@ model Boleto {
   @@map("boletos")
 }
 
+model Entrega {
+  id            String   @id @default(cuid())
+  titulo        String   @default("Nova entrega")
+  dataHora      DateTime
+  nomeRecebedor String
+  recebidoPor   String // "portaria", "zelador", "morador"
+  unidadeId     String
+  anexo         String? // Caminho do arquivo anexo (foto do produto)
+  userId        String // Usuário do condomínio
+  empresaId     String? // ID da empresa (para isolamento de dados) - nullable para migração
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  unidade Unidade  @relation(fields: [unidadeId], references: [id])
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
+
+  @@index([empresaId])
+  @@index([unidadeId])
+  @@map("entregas")
+}
+
 model Reuniao {
   id        String   @id @default(cuid())
   titulo    String
@@ -221,23 +247,26 @@ model Reuniao {
 }
 
 model Aviso {
-  id         String    @id @default(cuid())
-  titulo     String
-  descricao  String
-  tipo       String    @default("Informativo") // "Informativo", "Urgente", "Atenção"
-  dataInicio DateTime
-  dataFim    DateTime?
-  destaque   Boolean   @default(false)
-  userId     String // Usuário do condomínio
-  empresaId  String? // ID da empresa (para isolamento de dados) - nullable para migração
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  titulo        String
+  descricao     String
+  tipo          String    @default("Informativo") // "Informativo", "Urgente", "Atenção"
+  dataInicio    DateTime
+  dataFim       DateTime?
+  destaque      Boolean   @default(false)
+  userId        String // Usuário do condomínio
+  destinatarioId String? // ID do morador destinatário (null = aviso geral para todos)
+  empresaId     String? // ID da empresa (para isolamento de dados) - nullable para migração
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user     User           @relation(fields: [userId], references: [id])
-  empresa  Empresa?       @relation(fields: [empresaId], references: [id])
-  leituras AvisoLeitura[]
+  user        User           @relation("AvisoCriador", fields: [userId], references: [id])
+  destinatario User?          @relation("AvisoDestinatario", fields: [destinatarioId], references: [id])
+  empresa     Empresa?        @relation(fields: [empresaId], references: [id])
+  leituras    AvisoLeitura[]
 
   @@index([empresaId])
+  @@index([destinatarioId])
   @@map("avisos")
 }
 
