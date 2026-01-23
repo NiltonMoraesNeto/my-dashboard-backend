@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   async create(createUserDto: CreateUserDto, empresaIdFromAuth?: string | null, isSuperAdminAuth?: boolean) {
     // Buscar perfis para validação
@@ -246,16 +250,21 @@ export class UsersService {
       data: { resetCode },
     });
 
-    // Em produção, aqui você enviaria um email
-    // Por enquanto, vamos apenas logar no console
-    console.log('🔑 ===== TOKEN DE RESET DE SENHA =====');
-    console.log(`📧 Email: ${email}`);
-    console.log(`🔢 Token: ${resetCode}`);
-    console.log('=====================================');
+    // Envia o token por email
+    try {
+      await this.emailService.sendResetPasswordEmail(
+        email,
+        resetCode,
+        user.nome,
+      );
+    } catch (error) {
+      console.error('Erro ao enviar email de reset de senha:', error);
+      // Não lança erro para não expor informações sensíveis
+      // O token ainda foi gerado e salvo no banco
+    }
 
     return {
-      message: 'Token gerado com sucesso',
-      resetCode, // Em produção, NÃO retorne isso na API!
+      message: 'Token gerado com sucesso. Verifique seu email.',
     };
   }
 
@@ -268,7 +277,7 @@ export class UsersService {
     }
 
     if (user.resetCode !== resetCode) {
-      throw new Error('Token inválido');
+      throw new BadRequestException('Token inválido');
     }
 
     // Hash da nova senha
