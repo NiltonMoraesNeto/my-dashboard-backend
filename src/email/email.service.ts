@@ -25,10 +25,6 @@ export class EmailService {
   ) {
     if (!this.resend) {
       console.warn('⚠️  Resend não configurado. Email não enviado.');
-      console.log('🔑 ===== TOKEN DE RESET DE SENHA =====');
-      console.log(`📧 Email: ${email}`);
-      console.log(`🔢 Token: ${resetCode}`);
-      console.log('=====================================');
       return;
     }
 
