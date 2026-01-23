@@ -158,6 +158,23 @@ export class UsersController {
   }
 
   @Public()
+  @Post('validate-reset-code')
+  @ApiOperation({ summary: 'Validar código de reset sem alterar senha' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token válido.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Token inválido.',
+  })
+  async validateResetCode(
+    @Body() body: { email: string; resetCode: string },
+  ) {
+    return this.usersService.validateResetCode(body.email, body.resetCode);
+  }
+
+  @Public()
   @Put('clean-resetCode')
   @ApiOperation({ summary: 'Limpar código de reset' })
   @ApiResponse({

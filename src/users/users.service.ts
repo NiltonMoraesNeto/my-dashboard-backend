@@ -276,7 +276,15 @@ export class UsersService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    if (user.resetCode !== resetCode) {
+    // Normaliza os valores para comparação (remove espaços e converte para string)
+    const normalizedResetCode = String(resetCode || '').trim();
+    const normalizedUserResetCode = String(user.resetCode || '').trim();
+
+    if (!user.resetCode) {
+      throw new BadRequestException('Nenhum token foi gerado para este email. Por favor, solicite um novo token.');
+    }
+
+    if (normalizedUserResetCode !== normalizedResetCode) {
       throw new BadRequestException('Token inválido');
     }
 
@@ -294,6 +302,37 @@ export class UsersService {
     return { message: 'Senha alterada com sucesso' };
   }
 
+  // Validate reset code (without changing password)
+  async validateResetCode(email: string, resetCode: string) {
+    // Normaliza o email (remove espaços e converte para lowercase)
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    // Normaliza os valores para comparação (remove espaços e converte para string)
+    const normalizedResetCode = String(resetCode || '').trim();
+    const normalizedUserResetCode = String(user.resetCode || '').trim();
+
+    if (!user.resetCode) {
+      throw new BadRequestException('Nenhum token foi gerado para este email. Por favor, solicite um novo token.');
+    }
+
+    if (normalizedUserResetCode !== normalizedResetCode) {
+      console.log('Token validation failed:', {
+        email,
+        received: normalizedResetCode,
+        expected: normalizedUserResetCode,
+      });
+      throw new BadRequestException('Token inválido');
+    }
+
+    return { message: 'Token válido', valid: true };
+  }
+
   // Clean reset code
   async cleanResetCode(email: string, resetCode: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
@@ -302,8 +341,12 @@ export class UsersService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    if (user.resetCode !== resetCode) {
-      throw new Error('Token inválido');
+    // Normaliza os valores para comparação (remove espaços e converte para string)
+    const normalizedResetCode = String(resetCode || '').trim();
+    const normalizedUserResetCode = String(user.resetCode || '').trim();
+
+    if (!user.resetCode || normalizedUserResetCode !== normalizedResetCode) {
+      throw new BadRequestException('Token inválido');
     }
 
     // Limpa o código
