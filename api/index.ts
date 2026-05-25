@@ -3,8 +3,13 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
 import express from 'express';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import {
+  configureCors,
+  configureHttpSecurity,
+  configureSwagger,
+  csrfProtection,
+} from '../src/config/security';
 
 let cachedHandler: any;
 
@@ -21,30 +26,11 @@ async function createHandler() {
     adapter,
   );
 
-  // Enable cookie parser
   app.use(cookieParser());
+  configureHttpSecurity(app);
+  app.use(csrfProtection);
 
-  // Enable CORS com suporte a cookies
-  const allowedOrigins = [
-    'http://localhost:5173',
-    process.env.FRONTEND_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-  ].filter(Boolean);
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
+  configureCors(app);
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -55,31 +41,7 @@ async function createHandler() {
     }),
   );
 
-  // Swagger configuration (opcional em produção)
-  if (process.env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('My Dashboard API')
-      .setDescription('API para o sistema de dashboard de vendas imobiliárias')
-      .setVersion('1.0')
-      .addTag('users', 'Operações relacionadas aos usuários')
-      .addTag('profiles', 'Operações relacionadas aos perfis')
-      .addTag('sales', 'Operações relacionadas às vendas')
-      .addTag('auth', 'Operações de autenticação')
-      .addTag('condominio', 'Operações relacionadas à gestão de condomínio')
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          description: 'Insira o token JWT obtido no login',
-        },
-        'access-token',
-      )
-      .build();
-
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api-docs', app, document);
-  }
+  configureSwagger(app);
 
   await app.init();
   

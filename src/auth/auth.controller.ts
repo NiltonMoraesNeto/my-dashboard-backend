@@ -13,6 +13,15 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, AuthResponseDto } from './dto/auth.dto';
 import { Public } from './public.decorator';
+import {
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  createCsrfToken,
+  getAuthCookieOptions,
+  getClearCookieOptions,
+  getClearCsrfCookieOptions,
+  getCsrfCookieOptions,
+} from '../config/security';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -38,14 +47,8 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
 
-    // Define o token em um httpOnly cookie
-    res.cookie('auth_token', result.access_token, {
-      httpOnly: true, // Não pode ser acessado por JavaScript
-      secure: process.env.NODE_ENV === 'production', // Só HTTPS em produção
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' necessário para cross-origin em produção
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
-      path: '/', // Disponível em todas as rotas
-    });
+    res.cookie(AUTH_COOKIE_NAME, result.access_token, getAuthCookieOptions());
+    res.cookie(CSRF_COOKIE_NAME, createCsrfToken(), getCsrfCookieOptions());
 
     // Retorna apenas os dados do usuário (sem o token)
     return {
@@ -62,13 +65,8 @@ export class AuthController {
     description: 'Logout realizado com sucesso.',
   })
   async logout(@Res({ passthrough: true }) res: Response) {
-    // Remove o cookie
-    res.clearCookie('auth_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-    });
+    res.clearCookie(AUTH_COOKIE_NAME, getClearCookieOptions());
+    res.clearCookie(CSRF_COOKIE_NAME, getClearCsrfCookieOptions());
 
     return { message: 'Logout realizado com sucesso' };
   }
@@ -94,8 +92,11 @@ export class AuthController {
     status: HttpStatus.OK,
     description: 'Status de autenticação.',
   })
-  async checkAuth(@Req() req: Request) {
-    const token = req.cookies?.auth_token;
+  async checkAuth(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = req.cookies?.[AUTH_COOKIE_NAME];
 
     if (!token) {
       return { isAuthenticated: false };
@@ -103,6 +104,10 @@ export class AuthController {
 
     try {
       const user = await this.authService.validateToken(token);
+      if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+        res.cookie(CSRF_COOKIE_NAME, createCsrfToken(), getCsrfCookieOptions());
+      }
+
       return {
         isAuthenticated: true,
         user: {

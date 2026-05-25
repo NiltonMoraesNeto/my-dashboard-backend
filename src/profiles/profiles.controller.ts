@@ -22,11 +22,12 @@ import {
   UpdateProfileDto,
   ProfileResponseDto,
 } from './dto/profile.dto';
-import { Public } from '../auth/public.decorator';
+import { UseSuperAdminGuard } from '../auth/super-admin.decorator';
 
 @ApiTags('profiles')
 @ApiBearerAuth('access-token')
 @Controller('profiles')
+@UseSuperAdminGuard()
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
@@ -41,7 +42,6 @@ export class ProfilesController {
     return this.profilesService.create(createProfileDto);
   }
 
-  @Public()
   @Get()
   @ApiOperation({ summary: 'Listar todos os perfis' })
   @ApiResponse({

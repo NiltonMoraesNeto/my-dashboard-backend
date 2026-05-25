@@ -44,26 +44,41 @@ async function main() {
     },
   });
 
-  // Seed Users
-  console.log('👥 Seeding users...');
-  const hashedPassword = await bcrypt.hash('Aladar100%', 10);
-  await prisma.user.upsert({
-    where: { email: 'nilton@nilton.com' },
-    update: {
-      empresaId: null, // SuperAdmin não tem empresaId (empresaId null = SuperAdmin)
-    },
-    create: {
-      nome: 'Nilton Moraes Neto',
-      email: 'nilton@nilton.com',
-      password: hashedPassword,
-      perfilId: 1, // SuperAdmin
-      cep: '80000000',
-      avatar:
-        'https://upload.wikimedia.org/wikipedia/commons/2/22/Logo_Flamengo_crest_1980-2018.png',
-      resetCode: '',
-      empresaId: null, // SuperAdmin não tem empresaId
-    },
-  });
+  // Seed SuperAdmin only when local credentials are explicitly provided.
+  const adminEmail = process.env.SEED_ADMIN_EMAIL;
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+
+  if (adminEmail && adminPassword) {
+    if (adminPassword.length < 12) {
+      throw new Error('SEED_ADMIN_PASSWORD must have at least 12 characters');
+    }
+
+    console.log('👥 Seeding SuperAdmin user...');
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {
+        empresaId: null,
+        perfilId: 99,
+      },
+      create: {
+        nome: process.env.SEED_ADMIN_NAME || 'SuperAdmin',
+        email: adminEmail,
+        password: hashedPassword,
+        perfilId: 99,
+        cep: '80000000',
+        empresaId: null,
+      },
+    });
+  } else {
+    console.log('ℹ️ Skipping SuperAdmin seed. Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD to create one.');
+  }
+
+  if (process.env.SEED_DEMO_DATA !== 'true') {
+    console.log('ℹ️ Skipping demo sales data. Set SEED_DEMO_DATA=true to include sample dashboard data.');
+    console.log('✅ Database seed completed successfully!');
+    return;
+  }
 
   // Seed Sales Data
   console.log('📊 Seeding sales data...');

@@ -77,6 +77,8 @@ model User {
   uf           String?
   avatar       String?
   resetCode    String?
+  resetCodeExpiresAt DateTime?
+  resetAttempts Int @default(0)
   condominioId String? // ID do condomínio que criou este morador (null para usuários normais)
   empresaId    String? // ID da empresa (null para SuperAdmin)
   createdAt    DateTime @default(now())

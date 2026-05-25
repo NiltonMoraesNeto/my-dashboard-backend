@@ -1,235 +1,87 @@
 # My Dashboard Backend
 
-API RESTful para o sistema de dashboard de vendas imobiliárias, construída com NestJS, Prisma, SQLite e documentada com Swagger.
+API NestJS para o sistema de gerenciamento de condomínio.
 
-## 🚀 Tecnologias
+## Stack
 
-- **Framework**: NestJS
-- **Banco de Dados**: SQLite com Prisma ORM
-- **Documentação**: Swagger/OpenAPI
-- **Validação**: class-validator & class-transformer
-- **Linguagem**: TypeScript
+- NestJS
+- Prisma
+- PostgreSQL
+- Cookie-only auth com CSRF
+- Swagger em desenvolvimento
 
-## 📋 Funcionalidades
+## Ambiente Local Com OrbStack
 
-### Módulos da API
-
-1. **Users** (`/users`)
-   - ✅ CRUD completo de usuários
-   - ✅ Relacionamento com perfis
-   - ✅ Validação de dados
-
-2. **Profiles** (`/profiles`)
-   - ✅ CRUD completo de perfis
-   - ✅ Gerenciamento de tipos de usuário
-
-3. **Sales** (`/sales`)
-   - ✅ CRUD de dados de vendas por ano
-   - ✅ CRUD de dados de vendas por edifício
-   - ✅ Filtros por ano e edifício
-
-## 🔧 Instalação e Execução
-
-### Pré-requisitos
-
-- Node.js (v18+)
-- npm
-
-### Instalação
+Suba o Postgres:
 
 ```bash
-# Clone o repositório (se aplicável)
-git clone <repository-url>
-cd my-dashboard-backend
+npm run db:up
+```
 
-# Instale as dependências
+Configure o `.env` local:
+
+```bash
+DATABASE_URL="postgresql://mydashboard:mydashboard@localhost:5434/mydashboard?schema=public"
+JWT_SECRET="troque-por-uma-chave-com-pelo-menos-32-caracteres"
+FRONTEND_URL="http://localhost:5173"
+RESEND_API_KEY=""
+RESEND_FROM_EMAIL=""
+RESEND_FROM_NAME="Sistema de Gestão"
+```
+
+Instale dependências, rode as migrations e aplique seed:
+
+```bash
 npm install
-
-# Configure o banco de dados
-npx prisma migrate dev
-
-# Popule o banco com dados iniciais
+npm run db:migrate
 npm run db:seed
 ```
 
-### Executar o Projeto
+Inicie o backend:
 
 ```bash
-# Desenvolvimento (com hot reload)
 npm run start:dev
-
-# Produção
-npm run build
-npm run start:prod
 ```
 
-O servidor estará disponível em: `http://localhost:4000`
+O servidor local fica em `http://localhost:4000`.
 
-## 📚 Documentação da API
+## DBeaver
 
-Acesse a documentação Swagger em: `http://localhost:4000/api-docs`
+Use estes dados para criar a conexão local:
 
-### Endpoints Principais
-
-#### Users
-
-- `GET /users` - Listar todos os usuários
-- `GET /users/:id` - Buscar usuário por ID
-- `POST /users` - Criar novo usuário
-- `PATCH /users/:id` - Atualizar usuário
-- `DELETE /users/:id` - Excluir usuário
-
-#### Profiles
-
-- `GET /profiles` - Listar todos os perfis
-- `GET /profiles/:id` - Buscar perfil por ID
-- `POST /profiles` - Criar novo perfil
-- `PATCH /profiles/:id` - Atualizar perfil
-- `DELETE /profiles/:id` - Excluir perfil
-
-#### Sales
-
-- `GET /sales` - Listar dados de vendas (com filtro por ano)
-- `GET /sales?year=2024` - Filtrar vendas por ano
-- `GET /sales/by-building` - Listar vendas por edifício
-- `GET /sales/by-building?buildingName=Edifício A` - Filtrar por edifício
-
-## 🗄️ Banco de Dados
-
-### Schema
-
-```typescript
-model User {
-  id        String   @id @default(cuid())
-  nome      String
-  email     String   @unique
-  password  String
-  perfilId  Int
-  cep       String?
-  avatar    String?
-  resetCode String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  perfil Profile @relation(fields: [perfilId], references: [id])
-}
-
-model Profile {
-  id        Int    @id @default(autoincrement())
-  descricao String
-  users     User[]
-}
-
-model SalesData {
-  id    String @id @default(cuid())
-  name  String
-  value Int
-  year  Int
-}
-
-model SalesDataByBuilding {
-  id           String @id @default(cuid())
-  name         String
-  value        Int
-  buildingName String
-}
+```text
+Host: localhost
+Port: 5434
+Database: mydashboard
+Username: mydashboard
+Password: mydashboard
 ```
 
-### Comandos Úteis do Prisma
+## Scripts
 
 ```bash
-# Gerar cliente Prisma
-npx prisma generate
-
-# Criar nova migração
-npx prisma migrate dev --name <nome-da-migração>
-
-# Resetar banco e aplicar seed
-npm run db:reset
-
-# Visualizar banco de dados
-npx prisma studio
+npm run db:up        # sobe Postgres local
+npm run db:down      # derruba containers locais
+npm run db:logs      # logs do Postgres
+npm run db:migrate   # cria/aplica migration em desenvolvimento
+npm run db:deploy    # aplica migrations em produção/CI
+npm run db:seed      # popula dados iniciais
+npm run build        # build de produção
+npm run start:prod   # roda dist/main.js
 ```
 
-## 🔧 Scripts Disponíveis
+## Banco
 
-```bash
-npm run start          # Iniciar em produção
-npm run start:dev      # Iniciar em desenvolvimento
-npm run build          # Build do projeto
-npm run db:seed        # Popular banco com dados
-npm run db:reset       # Resetar e popular banco
-npm run lint           # Executar linter
-npm run test           # Executar testes
-npm run test:e2e       # Executar testes e2e
-```
+O Prisma está configurado para PostgreSQL em [prisma/schema.prisma](./prisma/schema.prisma).
 
-## 📊 Dados de Exemplo
+Arquivos SQLite locais antigos, como `prisma/dev.db`, não devem ser versionados nem usados daqui para frente.
 
-O projeto vem com dados pré-populados:
+## Produção
 
-- **Perfis**: Administrador, RH, Financeiro, Compras, Vendas, Usuário
-- **Usuário**: Admin padrão
-- **Vendas**: Dados de 2024 e 2025 por mês
-- **Edifícios**: Dados de vendas para Edifício A, B e C
+Antes de publicar:
 
-## 🚀 Próximos Passos
-
-- [ ] Adicionar middleware de logging
-- [ ] Implementar cache com Redis
-- [ ] Adicionar testes unitários e e2e
-- [ ] Configurar CI/CD
-- [ ] Adicionar rate limiting
-
-## 🤝 Integração com Frontend
-
-Para conectar com o frontend React (`my-dashboard`), atualize as URLs da API para:
-
-```typescript
-const API_BASE_URL = 'http://localhost:4000';
-
-// Exemplos de endpoints
-const fetchUsers = () => fetch(`${API_BASE_URL}/users`);
-const fetchSales = (year) => fetch(`${API_BASE_URL}/sales?year=${year}`);
-const fetchSalesByBuilding = (building) =>
-  fetch(`${API_BASE_URL}/sales/by-building?buildingName=${building}`);
-```
-
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
+- Defina `DATABASE_URL` apontando para Postgres gerenciado.
+- Defina `JWT_SECRET` forte com pelo menos 32 caracteres.
+- Defina `FRONTEND_URL` com o domínio exato do frontend.
+- Rode `npm run db:deploy`.
+- Não exponha `/uploads` publicamente; arquivos devem sair por endpoints autenticados.

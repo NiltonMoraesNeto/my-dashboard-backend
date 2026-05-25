@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEmail, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength, IsNotEmpty } from 'class-validator';
 
 export class CreateMoradorDto {
   @ApiProperty({ description: 'Nome completo do morador' })
@@ -10,11 +10,11 @@ export class CreateMoradorDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'Senha do morador', required: false, default: '123456' })
-  @IsOptional()
+  @ApiProperty({ description: 'Senha provisória do morador' })
   @IsString()
+  @IsNotEmpty()
   @MinLength(6)
-  password?: string;
+  password: string;
 
   @ApiProperty({ description: 'CEP do morador', required: false })
   @IsOptional()
@@ -83,4 +83,3 @@ export class MoradorResponseDto {
   @ApiProperty()
   updatedAt: Date;
 }
-

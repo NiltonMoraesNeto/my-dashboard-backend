@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Post, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpStatus } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -86,23 +86,4 @@ export class DashboardController {
     return this.dashboardService.getComparisonData();
   }
 
-  @Post('seed-data')
-  @ApiOperation({ summary: 'Popular dados de exemplo para o dashboard' })
-  @ApiQuery({
-    name: 'year',
-    required: false,
-    description: 'Ano para popular os dados (padrão: ano atual)',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Dados de exemplo populados com sucesso',
-  })
-  async seedData(@Query('year') year?: string) {
-    const currentYear = year ? parseInt(year, 10) : new Date().getFullYear();
-    await this.dashboardService.seedMonthlyData(currentYear);
-    return {
-      status: HttpStatus.OK,
-      message: `Dados de exemplo populados para o ano ${currentYear}`,
-    };
-  }
 }

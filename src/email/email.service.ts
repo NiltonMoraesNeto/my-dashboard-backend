@@ -52,7 +52,7 @@ export class EmailService {
         throw new Error(`Erro ao enviar email: ${JSON.stringify(error)}`);
       }
 
-      console.log('✅ Email de reset de senha enviado com sucesso:', data);
+      console.log('✅ Email de reset de senha enviado com sucesso');
       return data;
     } catch (error) {
       console.error('❌ Erro ao enviar email de reset de senha:', error);

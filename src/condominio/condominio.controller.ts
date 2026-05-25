@@ -70,6 +70,42 @@ import {
   MoradorResponseDto,
 } from './dto/morador.dto';
 
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+const IMAGE_OR_PDF_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+];
+const PDF_MIMES = ['application/pdf'];
+
+function createUploadOptions(allowedMimes: string[]) {
+  return {
+    limits: {
+      fileSize: MAX_UPLOAD_SIZE,
+      files: 1,
+    },
+    fileFilter: (
+      _req: Request,
+      file: Express.Multer.File,
+      callback: (error: Error | null, acceptFile: boolean) => void,
+    ) => {
+      if (!allowedMimes.includes(file.mimetype)) {
+        return callback(
+          new BadRequestException('Tipo de arquivo não permitido'),
+          false,
+        );
+      }
+
+      return callback(null, true);
+    },
+  };
+}
+
+const documentUploadOptions = createUploadOptions(IMAGE_OR_PDF_MIMES);
+const boletoUploadOptions = createUploadOptions(PDF_MIMES);
+
 @ApiTags('condominio')
 @ApiBearerAuth('access-token')
 @Controller('condominio')
@@ -184,7 +220,7 @@ export class CondominioController {
 
   // ========== CONTAS A PAGAR ==========
   @Post('contas-pagar')
-  @UseInterceptors(FileInterceptor('anexo'))
+  @UseInterceptors(FileInterceptor('anexo', documentUploadOptions))
   @ApiOperation({ summary: 'Criar uma nova conta a pagar' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -261,7 +297,7 @@ export class CondominioController {
   }
 
   @Patch('contas-pagar/:id')
-  @UseInterceptors(FileInterceptor('anexo'))
+  @UseInterceptors(FileInterceptor('anexo', documentUploadOptions))
   @ApiOperation({ summary: 'Atualizar conta a pagar' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -296,9 +332,32 @@ export class CondominioController {
     return this.condominioService.removeContaPagar(userId, id);
   }
 
+  @Get('contas-pagar/:id/download')
+  @ApiOperation({ summary: 'Download do anexo da conta a pagar' })
+  async downloadContaPagarAnexo(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const user = req.user as AuthUser;
+    const userId = user.userId;
+    const filePath = await this.condominioService.getContaPagarAnexoPath(
+      userId,
+      id,
+    );
+
+    if (!filePath) {
+      return res.status(HttpStatus.NOT_FOUND).json({
+        message: 'Arquivo anexo não encontrado',
+      });
+    }
+
+    return res.download(filePath);
+  }
+
   // ========== BOLETOS ==========
   @Post('boletos')
-  @UseInterceptors(FileInterceptor('arquivo'))
+  @UseInterceptors(FileInterceptor('arquivo', boletoUploadOptions))
   @ApiOperation({ summary: 'Criar um novo boleto' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -373,7 +432,7 @@ export class CondominioController {
   }
 
   @Patch('boletos/:id')
-  @UseInterceptors(FileInterceptor('arquivo'))
+  @UseInterceptors(FileInterceptor('arquivo', boletoUploadOptions))
   @ApiOperation({ summary: 'Atualizar boleto' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -443,7 +502,7 @@ export class CondominioController {
 
   // ========== ENTREGAS ==========
   @Post('entregas')
-  @UseInterceptors(FileInterceptor('anexo'))
+  @UseInterceptors(FileInterceptor('anexo', documentUploadOptions))
   @ApiOperation({ summary: 'Criar uma nova entrega' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -569,7 +628,7 @@ export class CondominioController {
   }
 
   @Patch('entregas/:id')
-  @UseInterceptors(FileInterceptor('anexo'))
+  @UseInterceptors(FileInterceptor('anexo', documentUploadOptions))
   @ApiOperation({ summary: 'Atualizar uma entrega' })
   @ApiResponse({
     status: HttpStatus.OK,

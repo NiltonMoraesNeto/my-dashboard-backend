@@ -1,8 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
+
+const RESET_CODE_TTL_MINUTES = 15;
+const MAX_RESET_ATTEMPTS = 5;
+const RESET_MESSAGE =
+  'Se o email estiver cadastrado, enviaremos um código de recuperação.';
 
 @Injectable()
 export class UsersService {
@@ -10,6 +20,18 @@ export class UsersService {
     private prisma: PrismaService,
     private emailService: EmailService,
   ) {}
+
+  private assertCanAccessUser(
+    targetUser: { empresaId: string | null },
+    empresaIdFromAuth?: string | null,
+    isSuperAdminAuth?: boolean,
+  ) {
+    if (isSuperAdminAuth) return;
+
+    if (!empresaIdFromAuth || targetUser.empresaId !== empresaIdFromAuth) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+  }
 
   async create(createUserDto: CreateUserDto, empresaIdFromAuth?: string | null, isSuperAdminAuth?: boolean) {
     // Buscar perfis para validação
@@ -106,7 +128,6 @@ export class UsersService {
         perfilId: true,
         cep: true,
         avatar: true,
-        resetCode: true,
         empresaId: true,
         createdAt: true,
         updatedAt: true,
@@ -153,7 +174,6 @@ export class UsersService {
         cidade: true,
         uf: true,
         avatar: true,
-        resetCode: true,
         condominioId: true,
         empresaId: true,
         createdAt: true,
@@ -182,6 +202,8 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    this.assertCanAccessUser(user, empresaIdFromAuth, isSuperAdminAuth);
+
     // Lógica de empresaId:
     // - Se for SuperAdmin: pode alterar empresaId (usa do DTO)
     // - Se não for SuperAdmin: não pode alterar empresaId (mantém o atual ou usa do auth)
@@ -194,9 +216,7 @@ export class UsersService {
     } else {
       // Não-SuperAdmin não pode alterar empresaId, mantém o atual ou usa do auth
       delete updateData.empresaId;
-      if (empresaIdFromAuth !== undefined) {
-        updateData.empresaId = empresaIdFromAuth;
-      }
+      delete updateData.perfilId;
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -213,12 +233,14 @@ export class UsersService {
     return userWithoutPassword;
   }
 
-  async remove(id: string) {
+  async remove(id: string, empresaIdFromAuth?: string | null, isSuperAdminAuth?: boolean) {
     const user = await this.prisma.user.findUnique({ where: { id } });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
+
+    this.assertCanAccessUser(user, empresaIdFromAuth, isSuperAdminAuth);
 
     return this.prisma.user.delete({ where: { id } });
   }
@@ -235,25 +257,34 @@ export class UsersService {
 
   // Forgot password - Generate reset token
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      return { message: RESET_MESSAGE };
     }
 
-    // Gera um token de 4 dígitos
-    const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const resetCode = randomInt(100000, 1000000).toString();
+    const hashedResetCode = await bcrypt.hash(resetCode, 10);
+    const resetCodeExpiresAt = new Date(
+      Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000,
+    );
 
-    // Salva o token no banco
     await this.prisma.user.update({
-      where: { email },
-      data: { resetCode },
+      where: { email: normalizedEmail },
+      data: {
+        resetCode: hashedResetCode,
+        resetCodeExpiresAt,
+        resetAttempts: 0,
+      },
     });
 
     // Envia o token por email
     try {
       await this.emailService.sendResetPasswordEmail(
-        email,
+        normalizedEmail,
         resetCode,
         user.nome,
       );
@@ -264,38 +295,67 @@ export class UsersService {
     }
 
     return {
-      message: 'Token gerado com sucesso. Verifique seu email.',
+      message: RESET_MESSAGE,
     };
+  }
+
+  private async validatePasswordResetUser(email: string, resetCode: string) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedResetCode = String(resetCode || '').trim();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user || !user.resetCode || !user.resetCodeExpiresAt) {
+      throw new BadRequestException('Código inválido ou expirado');
+    }
+
+    if (user.resetCodeExpiresAt.getTime() < Date.now()) {
+      await this.prisma.user.update({
+        where: { email: normalizedEmail },
+        data: {
+          resetCode: null,
+          resetCodeExpiresAt: null,
+          resetAttempts: 0,
+        },
+      });
+      throw new BadRequestException('Código inválido ou expirado');
+    }
+
+    if (user.resetAttempts >= MAX_RESET_ATTEMPTS) {
+      throw new BadRequestException(
+        'Muitas tentativas inválidas. Solicite um novo código.',
+      );
+    }
+
+    const isValid = await bcrypt.compare(normalizedResetCode, user.resetCode);
+    if (!isValid) {
+      await this.prisma.user.update({
+        where: { email: normalizedEmail },
+        data: { resetAttempts: { increment: 1 } },
+      });
+      throw new BadRequestException('Código inválido ou expirado');
+    }
+
+    return { user, normalizedEmail };
   }
 
   // Reset password with token
   async resetPassword(email: string, resetCode: string, newPassword: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const { normalizedEmail } = await this.validatePasswordResetUser(
+      email,
+      resetCode,
+    );
 
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
-    }
-
-    // Normaliza os valores para comparação (remove espaços e converte para string)
-    const normalizedResetCode = String(resetCode || '').trim();
-    const normalizedUserResetCode = String(user.resetCode || '').trim();
-
-    if (!user.resetCode) {
-      throw new BadRequestException('Nenhum token foi gerado para este email. Por favor, solicite um novo token.');
-    }
-
-    if (normalizedUserResetCode !== normalizedResetCode) {
-      throw new BadRequestException('Token inválido');
-    }
-
-    // Hash da nova senha
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Atualiza a senha
     await this.prisma.user.update({
-      where: { email },
+      where: { email: normalizedEmail },
       data: {
         password: hashedPassword,
+        resetCode: null,
+        resetCodeExpiresAt: null,
+        resetAttempts: 0,
       },
     });
 
@@ -304,55 +364,25 @@ export class UsersService {
 
   // Validate reset code (without changing password)
   async validateResetCode(email: string, resetCode: string) {
-    // Normaliza o email (remove espaços e converte para lowercase)
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    
-    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
-
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
-    }
-
-    // Normaliza os valores para comparação (remove espaços e converte para string)
-    const normalizedResetCode = String(resetCode || '').trim();
-    const normalizedUserResetCode = String(user.resetCode || '').trim();
-
-    if (!user.resetCode) {
-      throw new BadRequestException('Nenhum token foi gerado para este email. Por favor, solicite um novo token.');
-    }
-
-    if (normalizedUserResetCode !== normalizedResetCode) {
-      console.log('Token validation failed:', {
-        email,
-        received: normalizedResetCode,
-        expected: normalizedUserResetCode,
-      });
-      throw new BadRequestException('Token inválido');
-    }
+    await this.validatePasswordResetUser(email, resetCode);
 
     return { message: 'Token válido', valid: true };
   }
 
   // Clean reset code
   async cleanResetCode(email: string, resetCode: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const { normalizedEmail } = await this.validatePasswordResetUser(
+      email,
+      resetCode,
+    );
 
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
-    }
-
-    // Normaliza os valores para comparação (remove espaços e converte para string)
-    const normalizedResetCode = String(resetCode || '').trim();
-    const normalizedUserResetCode = String(user.resetCode || '').trim();
-
-    if (!user.resetCode || normalizedUserResetCode !== normalizedResetCode) {
-      throw new BadRequestException('Token inválido');
-    }
-
-    // Limpa o código
     await this.prisma.user.update({
-      where: { email },
-      data: { resetCode: null },
+      where: { email: normalizedEmail },
+      data: {
+        resetCode: null,
+        resetCodeExpiresAt: null,
+        resetAttempts: 0,
+      },
     });
 
     return { message: 'Código limpo com sucesso' };

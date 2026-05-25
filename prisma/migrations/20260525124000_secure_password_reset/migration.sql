@@ -1,0 +1,2 @@
+ALTER TABLE "usuarios" ADD COLUMN "resetCodeExpiresAt" TIMESTAMP(3);
+ALTER TABLE "usuarios" ADD COLUMN "resetAttempts" INTEGER NOT NULL DEFAULT 0;

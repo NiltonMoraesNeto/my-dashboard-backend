@@ -823,6 +823,22 @@ export class CondominioService {
     }
   }
 
+  async getContaPagarAnexoPath(userId: string, id: string): Promise<string | null> {
+    const contaPagar = await this.findOneContaPagar(userId, id);
+
+    if (!contaPagar.anexo) {
+      return null;
+    }
+
+    const fullPath = path.join(process.cwd(), contaPagar.anexo);
+
+    if (!fs.existsSync(fullPath)) {
+      return null;
+    }
+
+    return fullPath;
+  }
+
   async getBoletoPdfPath(userId: string, id: string): Promise<string | null> {
     const boleto = await this.findOneBoleto(userId, id);
     
@@ -1698,10 +1714,11 @@ export class CondominioService {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(
-      createMoradorDto.password || '123456',
-      10,
-    );
+    if (!createMoradorDto.password?.trim()) {
+      throw new BadRequestException('A senha provisória do morador é obrigatória.');
+    }
+
+    const hashedPassword = await bcrypt.hash(createMoradorDto.password, 10);
 
     return this.prisma.user.create({
       data: {

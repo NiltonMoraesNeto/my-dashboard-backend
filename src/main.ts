@@ -1,48 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
+import {
+  configureCors,
+  configureHttpSecurity,
+  configureSwagger,
+  csrfProtection,
+} from './config/security';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Enable cookie parser
   app.use(cookieParser());
+  configureHttpSecurity(app);
+  app.use(csrfProtection);
 
-  // Enable CORS com suporte a cookies
-  const allowedOrigins = [
-    'http://localhost:5173',
-    process.env.FRONTEND_URL, // URL do frontend em produção
-    'https://my-dashboard-seven-sage.vercel.app', // Hardcoded para garantir que funciona
-  ].filter(Boolean); // Remove valores undefined/null
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Permite requisições sem origin (ex: Postman, mobile apps)
-      if (!origin) return callback(null, true);
-      
-      // Permite qualquer subdomínio do Vercel
-      if (origin.endsWith('.vercel.app')) {
-        return callback(null, true);
-      }
-      
-      if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-        callback(null, true);
-      } else {
-        // Em produção, loga o origin que foi bloqueado para debug
-        if (process.env.NODE_ENV === 'production') {
-          console.warn(`CORS blocked origin: ${origin}`);
-        }
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true, // Permite envio de cookies
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
+  configureCors(app);
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -53,34 +28,7 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger configuration
-  const config = new DocumentBuilder()
-    .setTitle('My Dashboard API')
-    .setDescription('API para o sistema de dashboard de vendas imobiliárias')
-    .setVersion('1.0')
-    .addTag('users', 'Operações relacionadas aos usuários')
-    .addTag('profiles', 'Operações relacionadas aos perfis')
-    .addTag('sales', 'Operações relacionadas às vendas')
-    .addTag('auth', 'Operações de autenticação')
-    .addTag('condominio', 'Operações relacionadas à gestão de condomínio')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Insira o token JWT obtido no login',
-      },
-      'access-token',
-    )
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
-
-  // Servir arquivos estáticos da pasta uploads
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
+  configureSwagger(app);
 
   const port = process.env.PORT ?? 4000;
   
@@ -88,7 +36,9 @@ async function bootstrap() {
     // Escuta em 0.0.0.0 para permitir conexões externas (necessário no Railway)
     await app.listen(port, '0.0.0.0');
     console.log(`🚀 Application is running on: http://0.0.0.0:${port}`);
-    console.log(`📚 Swagger docs available at: http://0.0.0.0:${port}/api-docs`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📚 Swagger docs available at: http://0.0.0.0:${port}/api-docs`);
+    }
   } catch (error) {
     console.error('❌ Failed to start application:', error);
     process.exit(1);

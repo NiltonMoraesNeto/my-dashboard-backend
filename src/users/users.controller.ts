@@ -79,6 +79,19 @@ export class UsersController {
     return this.usersService.findAllCondominios(empresaId, isSuperAdmin);
   }
 
+  @Patch('change-password')
+  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Senha alterada com sucesso.',
+  })
+  async changePassword(
+    @Req() req,
+    @Body() body: ChangePasswordDto,
+  ) {
+    return this.usersService.changePassword(req.user.userId, body);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar usuário por ID' })
   @ApiResponse({
@@ -125,8 +138,11 @@ export class UsersController {
     status: HttpStatus.NOT_FOUND,
     description: 'Usuário não encontrado.',
   })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as AuthUser;
+    const empresaIdFromAuth = user.empresaId || null;
+    const isSuperAdminAuth = user.isSuperAdmin || false;
+    return this.usersService.remove(id, empresaIdFromAuth, isSuperAdminAuth);
   }
 
   @Public()
@@ -185,18 +201,5 @@ export class UsersController {
     @Body() body: { email: string; resetCode: string },
   ) {
     return this.usersService.cleanResetCode(body.email, body.resetCode);
-  }
-
-  @Patch('change-password')
-  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Senha alterada com sucesso.',
-  })
-  async changePassword(
-    @Req() req,
-    @Body() body: ChangePasswordDto,
-  ) {
-    return this.usersService.changePassword(req.user.userId, body);
   }
 }

@@ -48,7 +48,7 @@ const ResetPasswordEmail = ({
                   {resetCode}
                 </Text>
                 <Text className="text-sm text-gray-600">
-                  Este código expira em 1 hora
+                  Este código expira em 15 minutos
                 </Text>
               </Section>
 

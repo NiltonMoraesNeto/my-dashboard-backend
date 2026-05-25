@@ -33,7 +33,7 @@ async function migrateData() {
     const usuariosAtualizados = await prisma.user.updateMany({
       where: {
         empresaId: null,
-        perfilId: { not: 1 }, // Não atualizar SuperAdmin (perfilId 1)
+        perfilId: { not: 99 }, // Não atualizar SuperAdmin
       },
       data: {
         empresaId: empresaPadrao.id,

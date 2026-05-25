@@ -25,10 +25,12 @@ import {
   SalesDataResponseDto,
   SalesDataByBuildingResponseDto,
 } from './dto/sales.dto';
+import { UseSuperAdminGuard } from '../auth/super-admin.decorator';
 
 @ApiTags('sales')
 @ApiBearerAuth('access-token')
 @Controller('sales')
+@UseSuperAdminGuard()
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
